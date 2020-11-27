@@ -32,6 +32,7 @@
 extern "C"
 {
     void OpenCLInit();
+    void OpenCLRun(std::string file_name, std::string kernel_name);
     void OpenCLUnInit();
 }
 
