@@ -41,19 +41,19 @@ PUBLIC void OpenCLInit()
     };
 
     for (uint32_t i = 0; i < num_platforms; i++) {
-        for (const auto& pair : platform_info) {
+        for (const auto& [info_type, info_desc] : platform_info) {
             size_t size;
-            err = clGetPlatformInfo(platforms[i], pair.first, 0, nullptr, &size);
+            err = clGetPlatformInfo(platforms[i], info_type, 0, nullptr, &size);
             CHECK_RET(err != CL_SUCCESS, "get platform name error!");
 
             auto name = std::make_unique<char[]>(size);
             CHECK_RET(!name, "memory malloc error!");
 
-            err = clGetPlatformInfo(platforms[i], pair.first, size, name.get(), nullptr);
+            err = clGetPlatformInfo(platforms[i], info_type, size, name.get(), nullptr);
             CHECK_RET(err != CL_SUCCESS, "get platform name error!");
 
             std::cout << std::endl
-                      << pair.second <<": " << name.get() << std::endl;
+                      << info_desc << ": " << name.get() << std::endl;
         }
     }
 
@@ -73,19 +73,19 @@ PUBLIC void OpenCLInit()
     };
 
     for(uint32_t i = 0; i < num_devices; i++) {
-        for(const auto& pair : device_info) {
+        for(const auto& [info_type, info_desc] : device_info) {
             size_t size;
-            err = clGetDeviceInfo(devices[i], pair.first, 0, nullptr, &size);
+            err = clGetDeviceInfo(devices[i], info_type, 0, nullptr, &size);
             CHECK_RET(err != CL_SUCCESS, "get platform name error!");
 
             auto name = std::make_unique<char[]>(size);
             CHECK_RET(!name, "memory malloc error!");
 
-            err = clGetDeviceInfo(devices[i], pair.first, size, name.get(), nullptr);
+            err = clGetDeviceInfo(devices[i], info_type, size, name.get(), nullptr);
             CHECK_RET(err != CL_SUCCESS, "get platform name error!");
 
             std::cout << std::endl
-                      << pair.second << ": " << *(cl_uint *)(name.get()) << std::endl;
+                      << info_desc << ": " << *(cl_uint *)(name.get()) << std::endl;
         }
     }
 
