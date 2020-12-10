@@ -2,6 +2,7 @@
 #define BASE_H_
 
 #include "CL/cl.hpp"
+#include <vector>
 
 // Interface visibility
 #if defined _WIN32 || defined __CYGWIN__
@@ -32,8 +33,16 @@
 extern "C"
 {
     void OpenCLInit();
-    void OpenCLRun(std::string file_name, std::string kernel_name);
     void OpenCLUnInit();
+
+    ////kernel
+    cl_kernel GetOpenClKernel(std::string file_name, std::string kernel_name);
+    void RunKernel(cl_kernel kernel, const std::vector<size_t> &gws);
+    void ReleaseOpenCLKernel(cl_kernel kernel);
+
+    ////buffer
+    cl_mem CreateBuffer(cl_mem_flags flags, size_t size, void *host_ptr);
+    void ReadBuffer(cl_mem buffer, void *ptr, size_t size);
 }
 
 #endif

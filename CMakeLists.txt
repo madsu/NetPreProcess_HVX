@@ -39,4 +39,4 @@ target_link_libraries(${LIB_NAME} /usr/local/cuda/lib64/libOpenCL.so)
 
 aux_source_directory(${CMAKE_SOURCE_DIR}/testbed/src BIN_SRCS)
 add_executable(${PROJECT_NAME} ${BIN_SRCS})
-target_link_libraries(${PROJECT_NAME} ${LIB_NAME})
+target_link_libraries(${PROJECT_NAME} ${LIB_NAME} gtest)

@@ -1,4 +1,4 @@
-#include "base.h"
+#include "base_engine.h"
 
 #include <iostream>
 #include <fstream>
@@ -6,12 +6,22 @@
 #include <map>
 
 #define CHECK_RET(err, desc)            \
-    if (err) {                         \
+    if (err)                            \
+    {                                   \
         std::cout << desc << std::endl; \
         return;                         \
     }
 
-cl_context context;
+#define CHECK_WITH_RET(err, desc, ret)  \
+    if (err)                            \
+    {                                   \
+        std::cout << desc << std::endl; \
+        return ret;                     \
+    }
+
+cl_context context = nullptr;
+cl_program program = nullptr;
+cl_command_queue command_q = nullptr;
 
 PUBLIC void OpenCLInit()
 {
@@ -96,9 +106,11 @@ PUBLIC void OpenCLInit()
     context = clCreateContext(properties, num_devices, devices.get(), nullptr, nullptr, &err);
     CHECK_RET(err != CL_SUCCESS, "create context failed!");
 
+    command_q = clCreateCommandQueue(context, devices[0], 0, &err);
+    CHECK_RET(err != CL_SUCCESS, "create command_queue failed!");
 }
 
-std::string ReadFileContext(const std::string file_name)
+std::string ReadFileContent(const std::string file_name)
 {
     std::fstream file(file_name, std::ios::in);
     std::string context("");
@@ -113,31 +125,56 @@ std::string ReadFileContext(const std::string file_name)
     return context;
 }
 
-PUBLIC void OpenCLRun(std::string file_name, std::string kernel_name)
+PUBLIC cl_kernel GetOpenClKernel(std::string file_name, std::string kernel_name)
 {
     //read source file
-    std::string text = ReadFileContext(file_name);
-    CHECK_RET(text.empty(), "read file error!");
+    std::string text = ReadFileContent(file_name);
+    CHECK_WITH_RET(text.empty(), "read file error!", nullptr);
 
-    const char* raw_text = text.c_str();
+    const char *raw_text = text.c_str();
     const size_t raw_text_len = text.length();
 
     cl_int err;
     cl_program program = clCreateProgramWithSource(context, 1, &raw_text, &raw_text_len, &err);
-    CHECK_RET(err != CL_SUCCESS, "create program failed!");
+    CHECK_WITH_RET(err != CL_SUCCESS, "create program failed!", nullptr);
 
     err = clBuildProgram(program, 0, nullptr, nullptr, nullptr, nullptr);
-    CHECK_RET(err != CL_SUCCESS, "build program failed!");
+    CHECK_WITH_RET(err != CL_SUCCESS, "build program failed!", nullptr);
 
     cl_kernel kernel = clCreateKernel(program, kernel_name.c_str(), &err);
-    CHECK_RET(err != CL_SUCCESS, "create kernel failed!");
+    CHECK_WITH_RET(err != CL_SUCCESS, "create kernel failed!", nullptr);
 
-    ////input
-    
+    return kernel;
+}
 
+PUBLIC void RunKernel(cl_kernel kernel, const std::vector<size_t> &gws)
+{
+    cl_int err;
+    err = clEnqueueNDRangeKernel(command_q, kernel, gws.size(), nullptr, &gws[0], nullptr, 0, nullptr, nullptr);
+}
+
+PUBLIC void ReleaseOpenCLKernel(cl_kernel kernel)
+{
+    clReleaseKernel(kernel);
+}
+
+PUBLIC cl_mem CreateBuffer(cl_mem_flags flags, size_t size, void *host_ptr)
+{
+    cl_int err;
+    cl_mem buf = clCreateBuffer(context, flags, size, host_ptr, &err);
+    CHECK_WITH_RET(err != CL_SUCCESS, "Create Buffer Failed!", nullptr);
+
+    return buf;
+}
+
+PUBLIC void ReadBuffer(cl_mem buffer, void *ptr, size_t size)
+{
+    clEnqueueReadBuffer(command_q, buffer, true, 0, size, ptr, 0, nullptr, nullptr);
 }
 
 PUBLIC void OpenCLUnInit()
 {
+    clReleaseProgram(program);
+    clReleaseCommandQueue(command_q);
     clReleaseContext(context);
 }
