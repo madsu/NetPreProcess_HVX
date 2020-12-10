@@ -1,5 +1,6 @@
 #!/bin/bash
 
+rm -rf build_android
 mkdir build_android
 cd build_android
 cmake ../../ \

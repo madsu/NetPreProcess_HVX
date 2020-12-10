@@ -5,6 +5,8 @@
 #include <memory>
 #include <map>
 
+#include "opencl_wrapper.h"
+
 #define CHECK_RET(err, desc)            \
     if (err)                            \
     {                                   \
@@ -25,6 +27,8 @@ cl_command_queue command_q = nullptr;
 
 PUBLIC void OpenCLInit()
 {
+    OpenCLSymbols::GetInstance()->LoadOpenCLLibrary();
+
     cl_int err;
     cl_uint num_platforms;
     err = clGetPlatformIDs(0, nullptr, &num_platforms);
