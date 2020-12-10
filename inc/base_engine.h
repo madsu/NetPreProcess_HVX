@@ -43,6 +43,7 @@ extern "C"
     ////buffer
     cl_mem CreateBuffer(cl_mem_flags flags, size_t size, void *host_ptr);
     void ReadBuffer(cl_mem buffer, void *ptr, size_t size);
+    void ReleaseBuffer(cl_mem buffer);
 }
 
 #endif

@@ -100,6 +100,9 @@ TEST_F(OpenCLTest, CheckPrecision)
     }
 
     //////////////////////////
+    ReleaseBuffer(bufA);
+    ReleaseBuffer(bufB);
+    ReleaseBuffer(bufC);
     ReleaseOpenCLKernel(kernel);
 }
 

@@ -172,6 +172,11 @@ PUBLIC void ReadBuffer(cl_mem buffer, void *ptr, size_t size)
     clEnqueueReadBuffer(command_q, buffer, true, 0, size, ptr, 0, nullptr, nullptr);
 }
 
+PUBLIC void ReleaseBuffer(cl_mem buffer)
+{
+    clReleaseMemObject(buffer);
+}
+
 PUBLIC void OpenCLUnInit()
 {
     clReleaseProgram(program);
