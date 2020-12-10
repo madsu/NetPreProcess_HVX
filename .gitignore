@@ -1,2 +1,4 @@
 .vscode
 build/*
+script/build_linux
+script/build_android

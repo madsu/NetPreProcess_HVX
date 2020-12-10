@@ -35,8 +35,10 @@ include_directories(/usr/local/cuda/include)
 aux_source_directory(${CMAKE_SOURCE_DIR}/src LIB_SRCS)
 set(LIB_NAME ClDemo)
 add_library(${LIB_NAME} SHARED ${LIB_SRCS})
-target_link_libraries(${LIB_NAME} /usr/local/cuda/lib64/libOpenCL.so)
+#target_link_libraries(${LIB_NAME} /usr/local/cuda/lib64/libOpenCL.so)
 
 aux_source_directory(${CMAKE_SOURCE_DIR}/testbed/src BIN_SRCS)
 add_executable(${PROJECT_NAME} ${BIN_SRCS})
-target_link_libraries(${PROJECT_NAME} ${LIB_NAME} gtest)
+
+#target_link_libraries(${PROJECT_NAME} ${LIB_NAME} ${CMAKE_SOURCE_DIR}/otherlibs/gtest/lib/aarch64/libgtest.a)
+target_link_libraries(${PROJECT_NAME} ${LIB_NAME} gtest dl)
