@@ -16,7 +16,7 @@ public:
         end = std::chrono::system_clock::now();
         std::chrono::duration<double> elapsed = end - start;
         auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
-        printf("%s Elapsed time: %ld ms\n", info_, millis);
+        printf("%s Elapsed time: %lld ms\n", info_, millis);
     }
 
 private:
@@ -55,7 +55,7 @@ void GenerateRandom(float* array, int len)
 
 TEST_F(OpenCLTest, CheckPrecision)
 {
-    cl_kernel kernel = GetOpenClKernel("../src/cl/vec_add.cl", "vector_add");
+    cl_kernel kernel = GetOpenClKernel("vec_add.cl", "vector_add");
     //////////////////////////
     constexpr int len = 10240;
     auto arrayA = std::make_unique<float[]>(len);

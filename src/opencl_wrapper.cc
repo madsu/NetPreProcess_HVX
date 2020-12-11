@@ -86,8 +86,10 @@ bool OpenCLSymbols::UnLoadOpenCLLibrary() {
 bool OpenCLSymbols::LoadLibraryFromPath(const std::string &library_path) {
     handle_ = dlopen(library_path.c_str(), RTLD_NOW | RTLD_LOCAL);
     if (handle_ == nullptr) {
+        std::cout << "open lib failed:" << library_path << std::endl;
         return false;
     }
+    std::cout << "open lib success:" << library_path << std::endl;
     bool is_pixel = library_path == "libOpenCL-pixel.so";
     typedef void* (*loadOpenCLPointer_t)(const char* name);
     loadOpenCLPointer_t loadOpenCLPointer;
