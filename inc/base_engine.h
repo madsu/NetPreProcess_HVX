@@ -1,8 +1,8 @@
 #ifndef BASE_H_
 #define BASE_H_
 
-#include "CL/cl.hpp"
-#include <vector>
+#include <hexagon_types.h>
+#include <hvx_hexagon_protos.h>
 
 // Interface visibility
 #if defined _WIN32 || defined __CYGWIN__
@@ -30,20 +30,17 @@
 #endif
 #endif
 
+#define AL64 __attribute__((aligned(64)))
+
+#ifdef _cplusplus
 extern "C"
 {
-    void OpenCLInit();
-    void OpenCLUnInit();
+#endif
 
-    ////kernel
-    cl_kernel GetOpenClKernel(std::string file_name, std::string kernel_name);
-    void RunKernel(cl_kernel kernel, const std::vector<size_t> &gws);
-    void ReleaseOpenCLKernel(cl_kernel kernel);
+    void vec_abs(signed short AL64 *buf, unsigned int len);
 
-    ////buffer
-    cl_mem CreateBuffer(cl_mem_flags flags, size_t size, void *host_ptr);
-    void ReadBuffer(cl_mem buffer, void *ptr, size_t size);
-    void ReleaseBuffer(cl_mem buffer);
+#ifdef _cplusplus
 }
+#endif
 
 #endif
