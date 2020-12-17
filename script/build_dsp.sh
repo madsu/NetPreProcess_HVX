@@ -6,3 +6,5 @@ cd build_dsp
 cmake -DCMAKE_TOOLCHAIN_FILE=../../toolchains/hexagon.toolchain.cmake ../../
 
 make -j $(nproc)
+
+cp -rf DSPDemo ../../release
