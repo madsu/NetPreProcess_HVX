@@ -9,4 +9,4 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
 set(CMAKE_C_FLAGS "-O2 -mv60 -mhvx -mhvx-length=128B")
-set(CMAKE_CXX_FLAGS "-std=c++11 -O2 -mv60 -mhvx -mhvx-length=128B")
+set(CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libc++ -O2 -mv60 -mhvx -mhvx-length=128B")

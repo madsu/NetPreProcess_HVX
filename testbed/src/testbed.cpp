@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <cstdlib>
 #include "loadimg.h"
 
 #if defined(__hexagon__)

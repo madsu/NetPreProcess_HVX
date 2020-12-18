@@ -1,4 +1,5 @@
 #include "net_pre_process.h"
+#include <cmath>
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -62,7 +63,7 @@ void nv12_pre_process(const unsigned char *pSrc, int srcWidth, int srcHeight,
 
             for (int chn = 0; chn < 3; chn++)
             {
-                unsigned char *ptr = ptrList[chn];
+                const unsigned char *ptr = ptrList[chn];
                 int step = stepList[chn];
 
                 float sx = (dx + 0.5f) * (float)xratio - 0.5f;
