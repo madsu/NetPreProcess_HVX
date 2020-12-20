@@ -25,6 +25,35 @@ void nv13_pre_process_hvx(const unsigned char *pSrc, int srcWidth, int srcHeight
         yratio = (float)srcHeight / dstWidth;
     }
 
+    //计算xy在原图上的坐标
+    int *sx0 = 0; //(int *)malloc(srcWidth + srcHeight + srcWidth + srcHeight);
+    int *sy0 = sx0 + srcWidth;
+    int *sx1 = sy0 + srcHeight;
+    int *sy1 = sx1 + srcWidth;
+
+    float fx;
+    float fy;
+
+    for (int dx = 0; dx < dstWidth; ++dx)
+    {
+        fx = (float)((dx + 0.5) * xratio - 0.5);
+
+        int x = fx; //(int)floor(fx);
+
+        float u0 = fx - x;
+
+        if(x < 0) {
+            x = 0;
+            u0 = 0.f;
+        }
+        else if(x >= srcWidth) {
+            x = srcWidth - 1;
+            u0 = 0.f;
+        }
+
+        float u1 = 1.f - u0;
+    }
+
     for(int j = 0; j < dstHeight; ++j) {
         
     }

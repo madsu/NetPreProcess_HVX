@@ -1,0 +1,4 @@
+interface pre_process {
+    long nv12_hvx(inrout uint8 pSrc, in long srcWidth, in long srcHeight, 
+                  rout uint8 pDst, in long dstWidth, in long dstHeight, in long rotate);
+};

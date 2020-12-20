@@ -7,8 +7,24 @@ message(${CMAKE_CURRENT_SOURCE_DIR})
 
 option(ENABLE_HVX "hvx compute support" OFF)
 
-include_directories(inc)
-include_directories(otherlibs/common/inc)
+set(incs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/
+    ${CMAKE_CURRENT_SOURCE_DIR}/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/otherlibs/common/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/otherlibs/dsp/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/otherlibs/rpcmem/inc
+    ${HEXAGON_SDK_ROOT}/incs/
+    ${HEXAGON_SDK_ROOT}/incs/qlist
+    ${HEXAGON_SDK_ROOT}/incs/stddef
+    ${HEXAGON_SDK_ROOT}/incs/a1std
+)
+
+# Add necessary includes for the base build
+include_directories(
+    ${incs}        
+)
+
+set(CMAKE_CXX_STANDARD 11)
 
 if(ENABLE_HVX)
     add_compile_definitions(DQDSP6SS_PUB_BASE=0xFE200000)
@@ -26,5 +42,5 @@ if(ENABLE_HVX)
     target_link_libraries(${PROJECT_NAME} ${LIB_NAME})
     target_link_libraries(${PROJECT_NAME} hexagon)
 else()
-    target_link_libraries(${PROJECT_NAME} m)
+    target_link_libraries(${PROJECT_NAME} m log ${CMAKE_SOURCE_DIR}/otherlibs/rpcmem/libs/android_aarch64/rpcmem.a)
 endif()
