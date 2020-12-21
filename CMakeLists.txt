@@ -13,6 +13,7 @@ set(incs
     ${CMAKE_CURRENT_SOURCE_DIR}/otherlibs/common/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/otherlibs/dsp/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/otherlibs/rpcmem/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/otherlibs/qmath/inc
     ${CMAKE_CURRENT_BINARY_DIR}/
     ${HEXAGON_SDK_ROOT}/incs/
     ${HEXAGON_SDK_ROOT}/incs/qlist
@@ -98,6 +99,6 @@ elseif(ENABLE_HVX)
     aux_source_directory(${CMAKE_SOURCE_DIR}/testbed/src BIN_SRCS)
     add_executable(${PROJECT_NAME} ${BIN_SRCS} ${LIB_SRCS})
 
-    target_link_libraries(${PROJECT_NAME} hexagon)
+    target_link_libraries(${PROJECT_NAME} hexagon m)
     target_link_libraries(${PROJECT_NAME} ${CMAKE_SOURCE_DIR}/otherlibs/rpcmem/libs/hexagon_aarch64/rpcmem.a)
 endif()
