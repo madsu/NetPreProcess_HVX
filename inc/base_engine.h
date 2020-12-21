@@ -39,8 +39,8 @@ extern "C"
 
     void vec_abs(signed short AL64 *buf, unsigned int len);
 
-    void nv12_pre_process_hvx(const unsigned char *pSrc, int srcWidth, int srcHeight,
-                              unsigned char *pDst, int dstWidth, int dstHeight, int rotate);
+    void pre_process_nv12_hvx(const unsigned char *pSrc, int srcWidth, int srcHeight,
+                          unsigned char *pDst, int dstWidth, int dstHeight, int rotate);
 
 #ifdef _cplusplus
 }

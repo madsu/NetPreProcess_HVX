@@ -10,7 +10,7 @@ void vec_abs(signed short AL64 *buf, unsigned int len)
     }
 }
 
-void nv13_pre_process_hvx(const unsigned char *pSrc, int srcWidth, int srcHeight,
+void pre_process_nv12_hvx(const unsigned char *pSrc, int srcWidth, int srcHeight,
                           unsigned char *pDst, int dstWidth, int dstHeight, int rotate)
 {
     float xratio = 0;

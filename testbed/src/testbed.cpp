@@ -1,7 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <dlfcn.h>
+#include "dlfcn.h"
 #include "loadimg.h"
 #include "net_pre_process.h"
 #include "rpcmem.h"
@@ -64,6 +64,7 @@ int main(int argc, char **argv)
     }
 
 #ifdef __hexagon__
+    pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
 #else
     void* H = nullptr;
     int (*pre_process_nv12_hvx)(unsigned char *pSrc, int srcWidth, int srcHeight, unsigned char *pDst, int dstWidth, int dstHeight, int rotate);
@@ -84,6 +85,7 @@ int main(int argc, char **argv)
     pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
     dlclose(H);
 #endif
+    SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
 
 FAIL:
     free(image);
