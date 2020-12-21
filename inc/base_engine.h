@@ -37,7 +37,7 @@ extern "C"
 {
 #endif
 
-    void vec_abs(signed short AL64 *buf, unsigned int len);
+    void vec_abs(short *buf, int len);
 
     void pre_process_nv12_hvx(const unsigned char *pSrc, int srcWidth, int srcHeight,
                           unsigned char *pDst, int dstWidth, int dstHeight, int rotate);

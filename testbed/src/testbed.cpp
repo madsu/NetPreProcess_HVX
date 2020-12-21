@@ -63,13 +63,21 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    short *testVec = (short *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, sizeof(short) * 1024);
+    for (int i = 0; i < 1024; ++i) {
+        testVec[i] = i - 1024;
+    }
+
 #ifdef __hexagon__
-    pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
+    //pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
+
+    vec_abs(testVec, 1024);
+
 #else
     void* H = nullptr;
     int (*pre_process_nv12_hvx)(unsigned char *pSrc, int srcWidth, int srcHeight, unsigned char *pDst, int dstWidth, int dstHeight, int rotate);
-
-    H = dlopen("libnetprocess.so", RTLD_NOW);
+    void (*pre_process_vec_abs)(short *buf, int len);
+    H = dlopen("libnetprocess_stub.so", RTLD_NOW);
     if (!H) {
         printf("---ERROR, Failed to load libnetprocess.so\n");
         return -1;
@@ -82,10 +90,23 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
+    pre_process_vec_abs = (void (*)(short *, int))dlsym(H, "pre_process_vec_abs");
+    if (!pre_process_vec_abs) {
+        printf("---ERROR, pre_process_vec_abs not found\n");
+        dlclose(H);
+        return -1;
+    }
+
+    //pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
+    pre_process_vec_abs(testVec, 1024);
+
     dlclose(H);
 #endif
-    SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
+    //SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
+    printf("vec: \n");
+    for (int i = 0; i < 20; ++i) {
+        printf("%d ", testVec[i]);
+    }
 
 FAIL:
     free(image);
@@ -95,6 +116,8 @@ FAIL:
         rpcmem_free(dspSrcBuf);
     if (dspDstBuf)
         rpcmem_free(dspDstBuf);
+    if(testVec)
+        rpcmem_free(testVec);
 
     rpcmem_deinit();
     return 0;

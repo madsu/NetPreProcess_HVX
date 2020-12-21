@@ -1,6 +1,6 @@
 #include "base_engine.h"
 
-void vec_abs(signed short AL64 *buf, unsigned int len)
+void vec_abs(short *buf, int len)
 {
     int i;
     HVX_Vector *vbuf = (HVX_Vector *)(buf);
