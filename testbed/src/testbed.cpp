@@ -5,6 +5,7 @@
 #include "loadimg.h"
 #include "net_pre_process.h"
 #include "rpcmem.h"
+#include "pre_process.h"
 
 #if defined(__hexagon__)
 #include "base_engine.h"
@@ -58,7 +59,7 @@ int main(int argc, char **argv)
     }
 
     unsigned char *dspDstBuf = nullptr;
-    if (0 == (dspSrcBuf = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, dstLen))) {
+    if (0 == (dspDstBuf = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, dstLen))) {
         printf("---Error: alloc dspSrcBuf failed\n");
         return -1;
     }
@@ -73,9 +74,10 @@ int main(int argc, char **argv)
 
     pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
 #else
+    /*
     void* H = nullptr;
     int (*pre_process_nv12_hvx)(unsigned char *pSrc, int srcWidth, int srcHeight, unsigned char *pDst, int dstWidth, int dstHeight, int rotate);
-    void (*pre_process_vec_abs)(short *buf, int len);
+    int (*pre_process_vec_abs)(short *buf, int len);
     H = dlopen("libnetprocess_stub.so", RTLD_NOW);
     if (!H) {
         printf("---ERROR, Failed to load libnetprocess.so\n");
@@ -89,17 +91,38 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    pre_process_vec_abs = (void (*)(short *, int))dlsym(H, "pre_process_vec_abs");
+    pre_process_vec_abs = (int (*)(short *, int))dlsym(H, "pre_process_vec_abs");
     if (!pre_process_vec_abs) {
         printf("---ERROR, pre_process_vec_abs not found\n");
         dlclose(H);
         return -1;
     }
+    else {
+        printf("get pre_process_vec_abs succ!\n");
+    }
 
     //pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
-    pre_process_vec_abs(testVec, 1024);
+    printf("compute on DSP\n");
+    int n = (*pre_process_vec_abs)(testVec, 1024);
+    if(n != 0) {
+        printf("compute on DSP failed, err = %d\n", n);
+    }
 
     dlclose(H);
+    */
+
+   int retVal = 0;
+   remote_handle64 handle = -1;
+   char* preprocess_URI_Domain = pre_process_URI "&_dom=cdsp";
+   printf("domain=%s\n", preprocess_URI_Domain);
+   retVal = pre_process_open(preprocess_URI_Domain, &handle);
+   if(retVal) {
+       printf("unable to create fastrpc session on CDSP: err=%d\n", retVal);
+   }
+
+   pre_process_vec_abs(handle, testVec, 1024);
+    
+   pre_process_close(handle);
 #endif
     //SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
     printf("vec: \n");

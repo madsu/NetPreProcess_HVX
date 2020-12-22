@@ -1,22 +1,25 @@
 #!/bin/bash
 
-rm -rf build_android
-mkdir build_android
-cd build_android
+HEXAGON_CMAKE_ROOT=${HEXAGON_SDK_ROOT}/build/cmake
+_src=${PWD}
 
-#generate idl
-$HEXAGON_SDK_ROOT/tools/qaic/bin/qaic ../../inc/pre_process.idl
+V="android_Release_aarch64"
+_build=${_src}/${V}.cmake${_dir_surfix}
 
-cmake -DANDROID_NDK=${ANDROID_ROOT_DIR} \
-      -DCMAKE_TOOLCHAIN_FILE=$ANDROID_ROOT_DIR/build/cmake/android.toolchain.cmake \
-      -DHEXAGON_SDK_ROOT=${HEXAGON_SDK_ROOT} \
-      -DV=android_Release_aarch64 \
-      -DCMAKE_BUILD_TYPE=Debug \
-      -DANDROID_ABI=arm64-v8a \
-      -DANDROID_STL=none \
-      -DANDROID_NATIVE_API_LEVEL=21 \
-      ../../
+rm -rf ${_build} && mkdir -p ${_build}
+
+cd ${_build} && \
+    cmake \
+    -DCMAKE_SYSTEM_NAME="Android"  \
+    -DANDROID_NDK=${ANDROID_ROOT_DIR} \
+    -DCMAKE_TOOLCHAIN_FILE=${ANDROID_ROOT_DIR}/build/cmake/android.toolchain.cmake \
+    -DANDROID_ABI=arm64-v8a -DANDROID_STL=none\
+    -DANDROID_NATIVE_API_LEVEL=21 \
+    -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${_build} \
+    -DCMAKE_BUILD_TYPE=Debug  \
+    -DV=${V}  \
+    -DHEXAGON_CMAKE_ROOT=${HEXAGON_CMAKE_ROOT}\
+    -DCMAKE_VERBOSE_MAKEFILE=ON \
+    ../../
 
 make -j $(nproc)
-
-cp -rf DSPDemo ../../release

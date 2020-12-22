@@ -1,6 +1,14 @@
-interface pre_process {
-    void nv12_hvx(inrout uint8 pSrc, in long srcWidth, in long srcHeight, 
-                  rout uint8 pDst, in long dstWidth, in long dstHeight, in long rotate);
 
-    void vec_abs(inrout short buf, in long len);
+#ifndef PRE_PROCESS_IDL
+#define PRE_PROCESS_IDL
+
+#include "AEEStdDef.idl"
+#include "remote.idl"
+
+interface pre_process : remote_handle64 {
+   long vec_abs(inrout short vec, in long len);
+   long nv12_hvx(inrout uint8 pSrc, in long srcWidth, in long srcHeight, 
+                        rout uint8 pDst, in long dstWidth, in long dstHeight, in long rotate);
 };
+
+#endif

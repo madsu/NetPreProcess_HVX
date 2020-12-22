@@ -1,11 +1,7 @@
 #ifndef __LOADIMAGE__
 #define __LOADIMAGE__
 
-#include "tcomdef.h"
-#include "tvloffscreen.h"
-#include "terror.h"
-
-#define LINE_BYTES(Width, BitCt) (((MLong)(Width) * (BitCt) + 31) / 32 * 4)
+#define LINE_BYTES(Width, BitCt) (((long)(Width) * (BitCt) + 31) / 32 * 4)
 
 long LoadBMP(const char* szFile, unsigned char** pBuffer, long* nWidth, long* nHeight, long* nBitCount);
 long SaveBMP(const char* szFile, unsigned char* pData, long nWidth, long nHeight, long nBitCount);

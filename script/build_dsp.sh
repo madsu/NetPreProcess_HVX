@@ -1,17 +1,22 @@
 #!/bin/bash
 
-rm -rf build_dsp
-mkdir build_dsp
-cd build_dsp
+HEXAGON_CMAKE_ROOT=${HEXAGON_SDK_ROOT}/build/cmake
+_src=${PWD}
 
-#generate idl
-$HEXAGON_SDK_ROOT/tools/qaic/bin/qaic ../../inc/pre_process.idl
+V="hexagon_Release_dynamic_toolv83_v66"
+_build=${_src}/${V}.cmake
 
-cmake -DCMAKE_TOOLCHAIN_FILE=$HEXAGON_SDK_ROOT/build/cmake/Hexagon_Toolchain.cmake \
-      -DHEXAGON_SDK_ROOT=${HEXAGON_SDK_ROOT} \
-      -DENABLE_HVX=ON \
-      ../../
+rm -rf ${_build} && mkdir -p ${_build}
+
+cd ${_build} && \
+    cmake \
+    -DCMAKE_TOOLCHAIN_FILE=${HEXAGON_CMAKE_ROOT}/Hexagon_Toolchain.cmake \
+    -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${_build} \
+    -DCMAKE_BUILD_TYPE=Debug  \
+    -DENABLE_HVX=ON \
+    -DV=${V}  \
+    -DHEXAGON_CMAKE_ROOT=${HEXAGON_CMAKE_ROOT}\
+    -DCMAKE_VERBOSE_MAKEFILE=ON \
+    ../../
 
 make -j $(nproc)
-
-cp -rf DSPDemo ../../release

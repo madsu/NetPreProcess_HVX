@@ -1,20 +1,43 @@
-#include "base_engine.h"
-#include <cstdlib>
-#include <cmath>
-#include "qmath.h"
+#include <stdlib.h>
+#include <math.h>
 
-void vec_abs(short *buf, int len)
+#include "HAP_farf.h"
+
+#include <hexagon_types.h>
+#include <hvx_hexagon_protos.h>
+
+#include "pre_process.h"
+
+int pre_process_open(const char *uri, remote_handle64 *h) 
 {
-    int i;
+    // benchmark has no state requiring a handle. Set to a dummy value.
+    *h = 0x00DEAD00;
+    return 0;
+}
+
+int pre_process_close(remote_handle64 h) 
+{
+    return 0;
+}
+
+int pre_process_vec_abs(remote_handle64 _h, short *buf, int len)
+{
+    /*
     HVX_Vector *vbuf = (HVX_Vector *)(buf);
     for (i = 0; i < len / 32; i++)
     {
         vbuf[i] = Q6_Vh_vabs_Vh(vbuf[i]);
     }
+    */
+   for(int i = 0; i < len; i++) {
+       buf[i] = buf[i] + 1024;
+   }
+
+    FARF(RUNTIME_HIGH, "===============     DSP: run vec_abs ===============");
+    return 0;
 }
 
-void pre_process_nv12_hvx(const unsigned char *pSrc, int srcWidth, int srcHeight,
-                          unsigned char *pDst, int dstWidth, int dstHeight, int rotate)
+int pre_process_nv12_hvx(remote_handle64 _h, uint8 *pSrc, int srcWidth, int srcHeight, uint8 *pDst, int dstWidth, int dstHeight, int rotate)
 {
     const int scale = 1 << 22;
     float xratio = 0;
@@ -132,4 +155,6 @@ void pre_process_nv12_hvx(const unsigned char *pSrc, int srcWidth, int srcHeight
 
         }
     }
+
+    return 0;
 }

@@ -2,4 +2,6 @@
 build/*
 script/build_linux
 script/build_dsp
+script/build_android
+script/*.cmake
 release
