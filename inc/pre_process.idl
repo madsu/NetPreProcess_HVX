@@ -3,9 +3,8 @@
 #define PRE_PROCESS_IDL
 
 #include "AEEStdDef.idl"
-#include "remote.idl"
 
-interface pre_process : remote_handle64 {
+interface pre_process {
    long vec_abs(inrout short vec, in long len);
    long nv12_hvx(inrout uint8 pSrc, in long srcWidth, in long srcHeight, 
                         rout uint8 pDst, in long dstWidth, in long dstHeight, in long rotate);

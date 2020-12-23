@@ -53,24 +53,37 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
         ${CMAKE_CURRENT_BINARY_DIR}/
         )
 
-    prepare_libraries_hexagon(hexagonTargets_1 hexagonIncs_1 hexagonLibs_1 hexagonSharedLibs_1
-        adsprpc
-        )
-
-    message(STATUS "hexagonTarget:${hexagonTargets_1}")
-    message(STATUS "hexagonLibs:${hexagonLibs_1}")
-    message(STATUS "hexagonIncs:${hexagonIncs_1}")
-
     buildIDL(inc/pre_process.idl ${LIB_NAME})
 
     include_directories(
         ${incs}
-        ${hexagonIncs_1}
         )
+    
+    # slect the required RPC Build
+    #default is CDSP
+    SET(dsprpc "cdsprpc")        
+    if(${DSP_TYPE} MATCHES "mdsp" )
+        #  MDSP
+        SET(dsprpc "mdsprpc")    
+    elseif(${DSP_TYPE} MATCHES "adsp")
+        #  ADSP
+        SET(dsprpc "adsprpc")        
+    elseif(${DSP_TYPE} MATCHES "sdsp")
+        #  SDSP
+        SET(dsprpc "sdsprpc")        
+    else()
+        #  Default CDSP
+        SET(dsprpc "cdsprpc")
+    endif()
+    add_library(${dsprpc} SHARED IMPORTED) # or STATIC instead of SHARED
+    set_target_properties(${dsprpc} PROPERTIES
+        IMPORTED_LOCATION "${HEXAGON_SDK_ROOT}/libs/common/remote/ship/${V}/lib${dsprpc}.so"
+        INTERFACE_INCLUDE_DIRECTORIES "${HEXAGON_SDK_ROOT}/libs/common/remote/ship/${V}/"
+    )
 
-    add_dependencies(${LIB_NAME} ${hexagonTargets_1})
+    add_dependencies(${LIB_NAME} ${dsprpc})
 
-    target_link_libraries(${LIB_NAME} ${hexagonLibs_1})
+    target_link_libraries(${LIB_NAME} ${dsprpc})
 
     prepare_libraries_hexagon(hexagonTargets_2 hexagonIncs_2 hexagonLibs_2 hexagonSharedLibs_2
         rpcmem.a
@@ -83,7 +96,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
     set (EXTRA_LIBS ${EXTRA_LIBS} ${hexagonLibs_2})
     set (EXTRA_LIBS ${EXTRA_LIBS} ${LIB_NAME})
 
-    add_dependencies(${PROJECT_NAME} ${LIB_NAME})
+    add_dependencies(${PROJECT_NAME} ${LIB_NAME} rpcmem)
 
     target_link_libraries( ${PROJECT_NAME} ${EXTRA_LIBS} m )
 

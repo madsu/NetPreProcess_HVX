@@ -74,11 +74,10 @@ int main(int argc, char **argv)
 
     pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
 #else
-    /*
     void* H = nullptr;
     int (*pre_process_nv12_hvx)(unsigned char *pSrc, int srcWidth, int srcHeight, unsigned char *pDst, int dstWidth, int dstHeight, int rotate);
     int (*pre_process_vec_abs)(short *buf, int len);
-    H = dlopen("libnetprocess_stub.so", RTLD_NOW);
+    H = dlopen("libpre_process_stub.so", RTLD_NOW);
     if (!H) {
         printf("---ERROR, Failed to load libnetprocess.so\n");
         return -1;
@@ -109,8 +108,8 @@ int main(int argc, char **argv)
     }
 
     dlclose(H);
-    */
 
+   /*
    int retVal = 0;
    remote_handle64 handle = -1;
    char* preprocess_URI_Domain = pre_process_URI "&_dom=cdsp";
@@ -123,6 +122,7 @@ int main(int argc, char **argv)
    pre_process_vec_abs(handle, testVec, 1024);
     
    pre_process_close(handle);
+   */
 #endif
     //SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
     printf("vec: \n");

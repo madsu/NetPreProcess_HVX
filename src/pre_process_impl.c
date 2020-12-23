@@ -1,26 +1,13 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "HAP_farf.h"
-
 #include <hexagon_types.h>
 #include <hvx_hexagon_protos.h>
 
+#include "HAP_farf.h"
 #include "pre_process.h"
 
-int pre_process_open(const char *uri, remote_handle64 *h) 
-{
-    // benchmark has no state requiring a handle. Set to a dummy value.
-    *h = 0x00DEAD00;
-    return 0;
-}
-
-int pre_process_close(remote_handle64 h) 
-{
-    return 0;
-}
-
-int pre_process_vec_abs(remote_handle64 _h, short *buf, int len)
+int pre_process_vec_abs(short *buf, int len)
 {
     /*
     HVX_Vector *vbuf = (HVX_Vector *)(buf);
@@ -37,7 +24,7 @@ int pre_process_vec_abs(remote_handle64 _h, short *buf, int len)
     return 0;
 }
 
-int pre_process_nv12_hvx(remote_handle64 _h, uint8 *pSrc, int srcWidth, int srcHeight, uint8 *pDst, int dstWidth, int dstHeight, int rotate)
+int pre_process_nv12_hvx(uint8 *pSrc, int srcWidth, int srcHeight, uint8 *pDst, int dstWidth, int dstHeight, int rotate)
 {
     const int scale = 1 << 22;
     float xratio = 0;
