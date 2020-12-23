@@ -1,10 +1,33 @@
+#include <cstdio>
+#include <cstdlib>
+#include <chrono>
+#include <cstring>
 
-#include <stdio.h>
-#include <stdlib.h>
 #include "dlfcn.h"
 #include "loadimg.h"
 #include "net_pre_process.h"
 #include "rpcmem.h"
+
+class ccosttime
+{
+public:
+	ccosttime(const char *szInfo)
+	{
+		strcpy(m_szInfo, szInfo);
+		start = std::chrono::system_clock::now();
+	}
+	~ccosttime()
+	{
+		end = std::chrono::system_clock::now();
+		std::chrono::duration<double> elapsed = end - start;
+		auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+		printf("%s Elapsed time: %lld milliseconds\n", m_szInfo, millis);
+	}
+
+private:
+	char m_szInfo[1024];
+	std::chrono::time_point<std::chrono::system_clock> start, end;
+};
 
 void PrintVec(short *vec, unsigned int len)
 {
@@ -72,11 +95,19 @@ int main(int argc, char **argv)
     void* H = nullptr;
     int (*func_ptr)(int* test, int len, int64* result);
     int (*pre_process_vec_abs)(int *vec, int vecLen);
+    int (*pre_process_nv12_ori)(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHeight, uint8 *pDst, int pDstLen, int dstWidth, int dstHeight, int rotate);
     int (*pre_process_nv12_hvx)(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHeight, uint8 *pDst, int pDstLen, int dstWidth, int dstHeight, int rotate);
 
     H = dlopen("libpre_process_stub.so", RTLD_NOW);
     if (!H) {
         printf("---ERROR, Failed to load libpre_process_stub.so\n");
+        return -1;
+    }
+
+    pre_process_nv12_ori = (int (*)(const uint8 *, int, int, int, uint8 *, int, int, int, int))dlsym(H, "pre_process_nv12_ori");
+    if (!pre_process_nv12_ori) {
+        printf("---ERROR, pre_process_nv12_hvx not found\n");
+        dlclose(H);
         return -1;
     }
 
@@ -129,17 +160,22 @@ int main(int argc, char **argv)
         printf("\n");
     }
 
-    n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf, dstLen, outWidth, outHeight, 0);
+    {
+        ccosttime a("pre_process_nv12_ori");
+        for (int i = 0; i < 100; ++i) {
+            n = pre_process_nv12_ori(dspSrcBuf, srcLen, width, height, dspDstBuf, dstLen, outWidth, outHeight, 0);
+        }
+    }
+
     if (n != 0) {
-        printf("nv12 on DSP failed, err = %d\n", n);
+        printf("nv12 ori on DSP failed, err = %d\n", n);
+    } else {
+        printf("pre_process nv12 ori succ!\n");
     }
-    else {
-        printf("pre_process succ!\n");
-    }
+    SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
 
     dlclose(H);
 #endif
-    SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
 
 FAIL:
     free(image);

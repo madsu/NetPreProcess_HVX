@@ -6,9 +6,12 @@
 
 interface pre_process {
    long vec_abs(inrout sequence<long> vec);
+   long sum(in sequence<long> vec, rout long long res);
+   
+   long nv12_ori(in sequence<uint8> pSrc, in long srcWidth, in long srcHeight, 
+                 inrout sequence<uint8> pDst, in long dstWidth, in long dstHeight, in long rotate);
    long nv12_hvx(in sequence<uint8> pSrc, in long srcWidth, in long srcHeight, 
                  inrout sequence<uint8> pDst, in long dstWidth, in long dstHeight, in long rotate);
-   long sum(in sequence<long> vec, rout long long res);
 };
 
 #endif
