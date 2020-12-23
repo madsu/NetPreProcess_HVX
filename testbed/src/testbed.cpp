@@ -6,11 +6,6 @@
 #include "net_pre_process.h"
 #include "rpcmem.h"
 
-extern "C"
-{
-    int pre_process_vec_abs(short *buf, int len);
-}
-
 void PrintVec(short *vec, unsigned int len)
 {
     printf("print vec: ");
@@ -66,7 +61,7 @@ int main(int argc, char **argv)
 
     int *testVec = (int *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, sizeof(int) * 1024);
     for (int i = 0; i < 1024; ++i) {
-        testVec[i] = i;
+        testVec[i] = i - 1024;
     }
 
 #ifdef __hexagon__
@@ -76,22 +71,23 @@ int main(int argc, char **argv)
 #else
     void* H = nullptr;
     int (*func_ptr)(int* test, int len, int64* result);
-    int (*pre_process_nv12_hvx)(unsigned char *pSrc, int srcWidth, int srcHeight, unsigned char *pDst, int dstWidth, int dstHeight, int rotate);
-    int (*pre_process_vec_abs)(short *buf, int len);
+    int (*pre_process_vec_abs)(int *vec, int vecLen);
+    int (*pre_process_nv12_hvx)(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHeight, uint8 *pDst, int pDstLen, int dstWidth, int dstHeight, int rotate);
+
     H = dlopen("libpre_process_stub.so", RTLD_NOW);
     if (!H) {
-        printf("---ERROR, Failed to load libnetprocess.so\n");
+        printf("---ERROR, Failed to load libpre_process_stub.so\n");
         return -1;
     }
 
-    pre_process_nv12_hvx = (int (*)(unsigned char *, int, int, unsigned char *, int, int, int))dlsym(H, "pre_process_nv12_hvx");
+    pre_process_nv12_hvx = (int (*)(const uint8 *, int, int, int, uint8 *, int, int, int, int))dlsym(H, "pre_process_nv12_hvx");
     if (!pre_process_nv12_hvx) {
         printf("---ERROR, pre_process_nv12_hvx not found\n");
         dlclose(H);
         return -1;
     }
 
-    pre_process_vec_abs = (int (*)(short *, int))dlsym(H, "pre_process_vec_abs");
+    pre_process_vec_abs = (int (*)(int *, int))dlsym(H, "pre_process_vec_abs");
     if (!pre_process_vec_abs) {
         printf("---ERROR, pre_process_vec_abs not found\n");
         dlclose(H);
@@ -112,7 +108,7 @@ int main(int argc, char **argv)
     }
     printf("compute on DSP\n");
     int64 result = 0;
-    int n = (*func_ptr)(testVec, 10, &result);
+    int n = func_ptr(testVec, 1024, &result);
     if (n != 0) {
         printf("compute on DSP failed, err = %d\n", n);
     }
@@ -120,36 +116,30 @@ int main(int argc, char **argv)
         printf("Sum = %lld\n", result);
     }
 
-    n = pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
+    n = pre_process_vec_abs(testVec, 1024);
+    if (n != 0) {
+        printf("compute on DSP failed, err = %d\n", n);
+    }
+    else {
+        printf("vec abs succ: ");
+        for (int i = 0; i < 20; ++i)
+        {
+            printf("%d ", testVec[i]);
+        }
+        printf("\n");
+    }
+
+    n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf, dstLen, outWidth, outHeight, 0);
     if (n != 0) {
         printf("nv12 on DSP failed, err = %d\n", n);
     }
     else {
-        printf("pre_process succ!");
+        printf("pre_process succ!\n");
     }
 
     dlclose(H);
-
-   /*
-   int retVal = 0;
-   remote_handle64 handle = -1;
-   char* preprocess_URI_Domain = pre_process_URI "&_dom=cdsp";
-   printf("domain=%s\n", preprocess_URI_Domain);
-   retVal = pre_process_open(preprocess_URI_Domain, &handle);
-   if(retVal) {
-       printf("unable to create fastrpc session on CDSP: err=%d\n", retVal);
-   }
-
-   pre_process_vec_abs(handle, testVec, 1024);
-    
-   pre_process_close(handle);
-   */
 #endif
     SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
-    printf("vec: \n");
-    for (int i = 0; i < 20; ++i) {
-        printf("%d ", testVec[i]);
-    }
 
 FAIL:
     free(image);

@@ -1,11 +1,13 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
+
+#include "HAP_farf.h"
+#include "pre_process.h"
 
 #include <hexagon_types.h>
 #include <hvx_hexagon_protos.h>
 
-#include "HAP_farf.h"
-#include "pre_process.h"
 
 int pre_process_sum(const int* vec, int vecLen, int64* res)
 {
@@ -18,26 +20,20 @@ int pre_process_sum(const int* vec, int vecLen, int64* res)
   return 0;
 }
 
-int pre_process_vec_abs(short *buf, int len)
+int pre_process_vec_abs(int* vec, int vecLen)
 {
-    /*
-    HVX_Vector *vbuf = (HVX_Vector *)(buf);
-    for (int i = 0; i < len / 32; i++)
-    {
-        vbuf[i] = Q6_Vh_vabs_Vh(vbuf[i]);
-    }
-    */
-
-    for (int i = 0; i < len; i++)
-    {
-        buf[i] = buf[i] + 1024;
+    HVX_Vector *vbuf = (HVX_Vector *)(vec);
+    for (int i = 0; i < vecLen / 32; i++) {
+        vbuf[i] = Q6_Vw_vabs_Vw(vbuf[i]);
     }
 
     FARF(RUNTIME_HIGH, "===============     DSP: run vec_abs ===============");
     return 0;
 }
 
-int pre_process_nv12_hvx(uint8 *pSrc, int srcWidth, int srcHeight, uint8 *pDst, int dstWidth, int dstHeight, int rotate)
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+int pre_process_nv12_hvx(const uint8* pSrc, int pSrcLen, int srcWidth, int srcHeight, uint8* pDst, int pDstLen, int dstWidth, int dstHeight, int rotate)
 {
     for (int j = 0; j < dstHeight; ++j)
     {
@@ -185,7 +181,6 @@ int pre_process_nv12_hvx(uint8 *pSrc, int srcWidth, int srcHeight, uint8 *pDst, 
             pDst[dst_idx + 2] = (unsigned char)r;
         }
     }
-
     return 0;
 }
 
