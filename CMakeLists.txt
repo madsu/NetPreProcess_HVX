@@ -13,7 +13,7 @@ set(CMAKE_DEBUG_TARGET_PROPERTIES
     )
 include(${HEXAGON_CMAKE_ROOT}/hexagon_fun.cmake)
 
-option(ENABLE_HVX "hvx compute support" OFF)
+option(BUILD_DSP_SHARED "build dsp so" OFF)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
     set(ignoreMe ${DSP_TYPE})
@@ -100,7 +100,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
 
     target_link_libraries( ${PROJECT_NAME} ${EXTRA_LIBS} m )
 
-elseif(ENABLE_HVX)
+elseif(BUILD_DSP_SHARED)
     aux_source_directory(${CMAKE_SOURCE_DIR}/src LIB_SRCS)
     set(LIB_NAME pre_process_skel)
     add_library(${LIB_NAME}
@@ -136,4 +136,37 @@ elseif(ENABLE_HVX)
     add_dependencies(${LIB_NAME} ${hexagonTargets})
 
     target_link_libraries(${LIB_NAME} ${hexagonLibs})
+
+else()
+    aux_source_directory(${CMAKE_SOURCE_DIR}/src LIB_SRCS)
+    aux_source_directory(${CMAKE_SOURCE_DIR}/testbed/src BIN_SRCS)
+    add_executable(${PROJECT_NAME} ${BIN_SRCS} ${LIB_SRCS})
+    set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX "-smi")
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
+
+    set(incs 
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/
+        ${CMAKE_CURRENT_BINARY_DIR}/
+        ${HEXAGON_SDK_ROOT}/incs/HAP/
+        #${HEXAGON_TOOLCHAIN_ROOT}/Tools/target/hexagon/include/
+        )
+
+    prepare_libraries_hexagon(hexagonTargets hexagonIncs hexagonLibs hexagonSharedLibs
+        libqprintf.a
+        rpcmem.a
+        )
+
+    include_directories(
+        ${incs}
+        ${hexagonIncs}
+        )
+
+    set (EXTRA_LIBS ${EXTRA_LIBS} ${hexagonLibs})
+
+    buildIDL(inc/pre_process.idl ${PROJECT_NAME} ${hexagonIncs})
+
+    add_dependencies(${PROJECT_NAME} ${hexagonTargets})
+    
+    target_link_libraries(${PROJECT_NAME} ${EXTRA_LIBS})
 endif()

@@ -13,7 +13,6 @@ cd ${_build} && \
     -DCMAKE_TOOLCHAIN_FILE=${HEXAGON_CMAKE_ROOT}/Hexagon_Toolchain.cmake \
     -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${_build} \
     -DCMAKE_BUILD_TYPE=Debug  \
-    -DBUILD_DSP_SHARED=ON \
     -DV=${V}  \
     -DHEXAGON_CMAKE_ROOT=${HEXAGON_CMAKE_ROOT}\
     -DCMAKE_VERBOSE_MAKEFILE=ON \
@@ -21,4 +20,4 @@ cd ${_build} && \
 
 make -j $(nproc)
 
-cp *.so ../../release
+cp DSPDemo-smi ../../release

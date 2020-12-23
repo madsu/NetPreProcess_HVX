@@ -23,3 +23,6 @@ cd ${_build} && \
     ../../
 
 make -j $(nproc)
+
+cp *.so ../../release
+cp DSPDemo ../../release

@@ -5,15 +5,11 @@
 #include "loadimg.h"
 #include "net_pre_process.h"
 #include "rpcmem.h"
-#include "pre_process.h"
 
-#if defined(__hexagon__)
-#include "base_engine.h"
-#include "hexagon_standalone.h"
-#include "subsys.h"
-#include "io.h"
-#include "hvx.cfg.h"
-#endif
+extern "C"
+{
+    int pre_process_vec_abs(short *buf, int len);
+}
 
 void PrintVec(short *vec, unsigned int len)
 {
@@ -58,23 +54,28 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    for(int i = 0; i < srcLen; ++i) {
+        dspSrcBuf[i] = image[i];
+    }
+
     unsigned char *dspDstBuf = nullptr;
     if (0 == (dspDstBuf = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, dstLen))) {
         printf("---Error: alloc dspSrcBuf failed\n");
         return -1;
     }
 
-    short *testVec = (short *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, sizeof(short) * 1024);
+    int *testVec = (int *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, sizeof(int) * 1024);
     for (int i = 0; i < 1024; ++i) {
-        testVec[i] = i - 1024;
+        testVec[i] = i;
     }
 
 #ifdef __hexagon__
-    vec_abs(testVec, 1024);
+    pre_process_vec_abs(testVec, 1024);
 
-    pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
+    //pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
 #else
     void* H = nullptr;
+    int (*func_ptr)(int* test, int len, int64* result);
     int (*pre_process_nv12_hvx)(unsigned char *pSrc, int srcWidth, int srcHeight, unsigned char *pDst, int dstWidth, int dstHeight, int rotate);
     int (*pre_process_vec_abs)(short *buf, int len);
     H = dlopen("libpre_process_stub.so", RTLD_NOW);
@@ -100,11 +101,31 @@ int main(int argc, char **argv)
         printf("get pre_process_vec_abs succ!\n");
     }
 
-    //pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
+    func_ptr = (int (*)(int*, int, int64*))dlsym(H, "pre_process_sum");
+    if(!func_ptr) {
+        printf("---ERROR, pre_process_sum not found\n");
+        dlclose(H);
+        return -1;
+    }
+    else {
+        printf("get pre_process_sum succ!\n");
+    }
     printf("compute on DSP\n");
-    int n = (*pre_process_vec_abs)(testVec, 1024);
-    if(n != 0) {
+    int64 result = 0;
+    int n = (*func_ptr)(testVec, 10, &result);
+    if (n != 0) {
         printf("compute on DSP failed, err = %d\n", n);
+    }
+    else {
+        printf("Sum = %lld\n", result);
+    }
+
+    n = pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
+    if (n != 0) {
+        printf("nv12 on DSP failed, err = %d\n", n);
+    }
+    else {
+        printf("pre_process succ!");
     }
 
     dlclose(H);
@@ -124,7 +145,7 @@ int main(int argc, char **argv)
    pre_process_close(handle);
    */
 #endif
-    //SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
+    SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
     printf("vec: \n");
     for (int i = 0; i < 20; ++i) {
         printf("%d ", testVec[i]);
