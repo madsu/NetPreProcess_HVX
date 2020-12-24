@@ -112,10 +112,10 @@ elseif(BUILD_DSP_SHARED)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
 
     set(incs 
+        ${CMAKE_CURRENT_SOURCE_DIR}/otherlibs/dsp/inc
         ${CMAKE_CURRENT_SOURCE_DIR}/src/
         ${CMAKE_CURRENT_BINARY_DIR}/
         ${HEXAGON_SDK_ROOT}/incs/HAP/
-        #${HEXAGON_TOOLCHAIN_ROOT}/Tools/target/hexagon/include/
         )
     
     prepare_libraries_hexagon(hexagonTargets hexagonIncs hexagonLibs hexagonSharedLibs

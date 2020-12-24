@@ -2,12 +2,13 @@
 #include <stdio.h>
 #include <math.h>
 
-#include "HAP_farf.h"
-#include "pre_process.h"
-
 #include <hexagon_types.h>
 #include <hvx_hexagon_protos.h>
 
+#include "HAP_farf.h"
+#include "hvx.cfg.h"
+
+#include "pre_process.h"
 
 int pre_process_sum(const int* vec, int vecLen, int64* res)
 {
@@ -33,7 +34,7 @@ int pre_process_vec_abs(int* vec, int vecLen)
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
-int pre_process_nv12_hvx(const uint8* pSrc, int pSrcLen, int srcWidth, int srcHeight, uint8* pDst, int pDstLen, int dstWidth, int dstHeight, int rotate)
+int pre_process_nv12_ori(const uint8* pSrc, int pSrcLen, int srcWidth, int srcHeight, uint8* pDst, int pDstLen, int dstWidth, int dstHeight, int rotate)
 {
     for (int j = 0; j < dstHeight; ++j)
     {
@@ -184,126 +185,151 @@ int pre_process_nv12_hvx(const uint8* pSrc, int pSrcLen, int srcWidth, int srcHe
     return 0;
 }
 
-/*
-int pre_process_nv12_hvx(uint8 *pSrc, int srcWidth, int srcHeight, uint8 *pDst, int dstWidth, int dstHeight, int rotate)
+int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHeight, uint8 *pDst, int pDstLen, int dstWidth, int dstHeight, int rotate)
 {
-    const int scale = 1 << 22;
+    const int scale = 1 << 8;
     float xratio = 0;
     float yratio = 0;
 
     if (rotate == 0 || rotate == 180) {
         xratio = (float)srcWidth / dstWidth;
         yratio = (float)srcHeight / dstHeight;
-    }
-    else {
+    } else {
         xratio = (float)srcWidth / dstHeight;
         yratio = (float)srcHeight / dstWidth;
     }
 
     //计算xy在原图上的坐标
-    int *sxAry = (int *)malloc((srcWidth + srcHeight) * sizeof(int));
-    int *syAry = sxAry + srcWidth;
+    int *sxAry = (int *)memalign(VLEN, srcWidth * sizeof(int));
+    int *syAry = (int *)memalign(VLEN, srcHeight * sizeof(int));
 
-    int *fxAry = (int *)malloc((srcWidth + srcHeight) * sizeof(int));
-    int *fyAry = fxAry + srcWidth;
+    unsigned char *fxAry = (unsigned char *)memalign(VLEN, srcWidth * sizeof(unsigned short));
+    unsigned char *fyAry = (unsigned char *)memalign(VLEN, srcHeight * sizeof(unsigned short));
 
-    int *fxSubAry = (int *)malloc((srcWidth + srcHeight) * sizeof(int));
-    int *fySubAry = fxAry + srcWidth;
-
-    for (int dx = 0; dx < dstWidth; ++dx)
-    {
+    for (int dx = 0; dx < dstWidth; ++dx) {
         float fx = (float)((dx + 0.5) * xratio - 0.5);
 
         int x = (int)floor(fx);
-
         float u = fx - x;
-
-        if (x < 0)
-        {
+        if (x < 0) {
             x = 0;
             u = 0.f;
-        }
-        else if (x >= srcWidth)
-        {
+        } else if (x >= srcWidth) {
             x = srcWidth - 1;
             u = 0.f;
         }
 
         sxAry[dx] = x;
-        fxAry[dx] = (int)(u * scale);
-        fxSubAry[dx] = scale - fxAry[dx];
+        fxAry[dx] = (unsigned char)(u * scale);
     }
 
-    for (int dy = 0; dy < dstHeight; ++dy)
-    {
+    for (int dy = 0; dy < dstHeight; ++dy) {
         float fy = (float)((dy + 0.5f) * yratio - 0.5f);
+
         int y = (int)floor(fy);
-
         float v = fy - y;
-
-        if (y < 0)
-        {
+        if (y < 0) {
             y = 0;
             v = 0.f;
-        }
-        else if (y >= srcHeight)
-        {
+        } else if (y >= srcHeight) {
             y = srcHeight - 1;
             v = 0.f;
         }
 
         syAry[dy] = y;
-        fyAry[dy] = (int)(v * scale);
-        fySubAry[dy] = scale - fySubAry[dy];
+        fyAry[dy] = (unsigned char)(v * scale);
     }
 
-    unsigned char *buf = (unsigned char *)malloc(sizeof(unsigned char) * 128 * 4);
+    unsigned char *buf = (unsigned char *)memalign(VLEN, sizeof(unsigned char) * VLEN * 4);
     unsigned char *pX0Y0 = buf;
-    unsigned char *pX1Y0 = buf + 128;
-    unsigned char *pX0Y1 = buf + 128 * 2;
-    unsigned char *pX1Y1 = buf + 128 * 3;
+    unsigned char *pX1Y0 = buf + VLEN;
+    unsigned char *pX0Y1 = buf + VLEN * 2;
+    unsigned char *pX1Y1 = buf + VLEN * 3;
 
     //每次算128个像素
-    for(int dy = 0; dy < dstHeight; ++dy) {
+    for (int dy = 0; dy < 1; ++dy) {
+        //Load V
+        HVX_Vector vVScaleh = Q6_Vh_vsplat_R(scale);
+        HVX_Vector vV0uh = Q6_Vh_vsplat_R(fyAry[dy]);
+        HVX_Vector vV1uh = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh);
 
-        int ii = dstWidth / 128;
-        for (int i = 0; i < ii; i++) {
-            //load to buf;
-            for (int dx = i * 128; dx < i * 128 + 128; ++dx) {
+        int ii = dstWidth / VLEN;
+        int remain = dstWidth & VLEN;
+        for (int i = 0; i < 1; i++) {
+            int startX = i * VLEN;
+
+            //Load U
+            HVX_Vector vVScaleb = Q6_Vb_vsplat_R(scale);
+            HVX_Vector *pU0 = (HVX_Vector *)(fxAry + startX);
+            HVX_Vector vU0ub = pU0[0];
+            HVX_Vector vU1ub = Q6_Vb_vsub_VbVb(vVScaleb, vU0ub);
+
+            //load Y to buf;
+            for (int dx = startX; dx < 128; ++dx) {
                 pX0Y0[dx] = pSrc[syAry[dy] * srcWidth + sxAry[dx]];
                 pX1Y0[dx] = pSrc[syAry[dy] * srcWidth + sxAry[dx] + 1];
                 pX0Y1[dx] = pSrc[(syAry[dy] + 1) * srcWidth + sxAry[dx]];
                 pX0Y1[dx] = pSrc[(syAry[dy] + 1) * srcWidth + (sxAry[dx] + 1)];
+                pDst[dx] = pX0Y0[dx];
             }
-
             HVX_Vector *vX0Y0 = (HVX_Vector *)(pX0Y0);
             HVX_Vector *vX1Y0 = (HVX_Vector *)(pX1Y0);
             HVX_Vector *vX0Y1 = (HVX_Vector *)(pX0Y1);
             HVX_Vector *vX1Y1 = (HVX_Vector *)(pX1Y1);
+            HVX_Vector vX0Y0ub = vX0Y0[0];
+            HVX_Vector vX1Y0ub = vX1Y0[0];
+            HVX_Vector vX0Y1ub = vX0Y1[0];
+            HVX_Vector vX1Y1ub = vX1Y1[0];
 
-            HVX_VectorPair pX0Y0h = Q6_Wuh_vzxt_Vub(vX0Y0[0]);
-            HVX_VectorPair pX1Y0h = Q6_Wuh_vzxt_Vub(vX1Y0[0]);
-            HVX_VectorPair pX0Y1h = Q6_Wuh_vzxt_Vub(vX0Y1[0]);
-            HVX_VectorPair pX1Y1h = Q6_Wuh_vzxt_Vub(vX1Y1[0]);
+            HVX_VectorPair pt0 = Q6_Wuh_vmpy_VubVub(vX0Y0ub, vU1ub);
+            pt0 = Q6_Wuh_vmpyacc_WuhVubVub(pt0, vX1Y0ub, vU0ub);
+            HVX_VectorPair pt1 = Q6_Wuh_vmpy_VubVub(vX0Y0ub, vU0ub);
+            pt1 = Q6_Wuh_vmpyacc_WuhVubVub(pt1, vX1Y0ub, vU1ub);
 
-            HVX_VectorPair pX0Y0wH = Q6_Wuw_vzxt_Vuh(Q6_V_hi_W(pX0Y0h));
-            HVX_VectorPair pX0Y0wL = Q6_Wuw_vzxt_Vuh(Q6_V_lo_W(pX0Y0h));
-            HVX_VectorPair pX1Y0wH = Q6_Wuw_vzxt_Vuh(Q6_V_hi_W(pX1Y0h));
-            HVX_VectorPair pX1Y0wL = Q6_Wuw_vzxt_Vuh(Q6_V_lo_W(pX1Y0h));
-            HVX_VectorPair pX0Y1wH = Q6_Wuw_vzxt_Vuh(Q6_V_hi_W(pX0Y1h));
-            HVX_VectorPair pX0Y1wL = Q6_Wuw_vzxt_Vuh(Q6_V_lo_W(pX0Y1h));
-            HVX_VectorPair pX1Y1wH = Q6_Wuw_vzxt_Vuh(Q6_V_hi_W(pX1Y1h));
-            HVX_VectorPair pX1Y1wL = Q6_Wuw_vzxt_Vuh(Q6_V_lo_W(pX1Y1h));
+            HVX_VectorPair pt0H = Q6_Wuw_vmpy_VuhVuh(Q6_V_hi_W(pt0), vV1uh);
+            HVX_VectorPair pt0L = Q6_Wuw_vmpy_VuhVuh(Q6_V_lo_W(pt0), vV1uh);
+            HVX_VectorPair pt1H = Q6_Wuw_vmpy_VuhVuh(Q6_V_hi_W(pt1), vV0uh);
+            HVX_VectorPair pt1L = Q6_Wuw_vmpy_VuhVuh(Q6_V_lo_W(pt1), vV0uh);
 
-            HVX_VectorPair *vU0 = (HVX_VectorPair *)(fxAry + i * 128);
-            HVX_VectorPair *vV0 = (HVX_VectorPair *)(fyAry + i * 128);
+            HVX_Vector r0w = Q6_Vuw_vadd_VuwVuw_sat(Q6_V_hi_W(pt0H), Q6_V_hi_W(pt1H));
+            HVX_Vector r1w = Q6_Vuw_vadd_VuwVuw_sat(Q6_V_lo_W(pt0H), Q6_V_lo_W(pt1H));
+            HVX_Vector r2w = Q6_Vuw_vadd_VuwVuw_sat(Q6_V_hi_W(pt0L), Q6_V_hi_W(pt1L));
+            HVX_Vector r3w = Q6_Vuw_vadd_VuwVuw_sat(Q6_V_lo_W(pt0L), Q6_V_lo_W(pt1L));
+            HVX_Vector r0h = Q6_Vuh_vasr_VwVwR_sat(r0w, r1w, 8);
+            HVX_Vector r1h = Q6_Vuh_vasr_VwVwR_sat(r2w, r3w, 8);
 
-            HVX_VectorPair *vU1 = (HVX_VectorPair *)(fxSubAry + i * 128);
-            HVX_VectorPair *vV1 = (HVX_VectorPair *)(fySubAry + i * 128);
+            HVX_Vector res = Q6_Vub_vasr_VhVhR_sat(Q6_Vh_vdeal_Vh(r0h), Q6_Vh_vdeal_Vh(r1h), 8);
+            HVX_Vector resY = Q6_Vb_vdeal_Vb(res);
 
+            HVX_Vector *p = (HVX_Vector *)(pDst + dy * dstWidth + startX);
+            *p = resY;
         }
+    }
+
+    if(buf) {
+        free(buf);
+        buf = NULL;
+    }
+
+    if (sxAry) {
+        free(sxAry);
+        sxAry = NULL;
+    }
+
+    if (syAry) {
+        free(syAry);
+        syAry = NULL;
+    }
+
+    if (fxAry) {
+        free(fxAry);
+        fxAry = NULL;
+    }
+
+    if (fyAry) {
+        free(fyAry);
+        fyAry = NULL;
     }
 
     return 0;
 }
-*/

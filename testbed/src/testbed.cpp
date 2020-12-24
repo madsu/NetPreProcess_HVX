@@ -162,7 +162,7 @@ int main(int argc, char **argv)
 
     {
         ccosttime a("pre_process_nv12_ori");
-        for (int i = 0; i < 100; ++i) {
+        for (int i = 0; i < 10; ++i) {
             n = pre_process_nv12_ori(dspSrcBuf, srcLen, width, height, dspDstBuf, dstLen, outWidth, outHeight, 0);
         }
     }
@@ -173,6 +173,32 @@ int main(int argc, char **argv)
         printf("pre_process nv12 ori succ!\n");
     }
     SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
+
+    for(int i = 0; i < srcLen; ++i) {
+        dspSrcBuf[i] = 125;
+    }
+
+    {
+        ccosttime a("pre_process_nv12_hvx");
+        for (int i = 0; i < 10; ++i) {
+            n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf, dstLen, outWidth, outHeight, 0);
+        }
+    }
+
+    if (n != 0) {
+        printf("nv12 hvx on DSP failed, err = %d\n", n);
+    } else {
+        printf("pre_process nv12 hvx succ!\n");
+    }
+
+    printf("nv12 hvx out: ");
+    unsigned short *ptr = (unsigned short *)dspDstBuf;
+    unsigned int *ptrI = (unsigned int *)dspDstBuf;
+    for(int i = 0; i < 64; ++i) {
+        printf("%d ", dspDstBuf[i]);
+    }
+    printf("\n");
+    //SaveBMP("./dsp_hvx_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
 
     dlclose(H);
 #endif
