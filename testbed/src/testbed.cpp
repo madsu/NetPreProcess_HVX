@@ -45,11 +45,11 @@ int main(int argc, char **argv)
     int width = 1920;
     int height = 1080;
 
-    int outWidth = 640;
+    int outWidth = 600;
     int outHeight = 360;
 
     unsigned char *image;
-    LoadYUV("0.nv21", width, height, &image);
+    LoadYUV(argv[1], width, height, &image);
 
     int srcLen = sizeof(unsigned char) * width * height * 3 / 2;
     int dstLen = sizeof(unsigned char) * outWidth * outHeight * 3;
@@ -174,13 +174,13 @@ int main(int argc, char **argv)
     }
     SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
 
-    for(int i = 0; i < srcLen; ++i) {
+    for (int i = 0; i < srcLen; ++i) {
         dspSrcBuf[i] = 125;
     }
 
     {
         ccosttime a("pre_process_nv12_hvx");
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < 1; ++i) {
             n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf, dstLen, outWidth, outHeight, 0);
         }
     }
@@ -194,8 +194,10 @@ int main(int argc, char **argv)
     printf("nv12 hvx out: ");
     unsigned short *ptr = (unsigned short *)dspDstBuf;
     unsigned int *ptrI = (unsigned int *)dspDstBuf;
-    for(int i = 0; i < 64; ++i) {
-        printf("%d ", dspDstBuf[i]);
+    float* pFloat = (float*)dspDstBuf;
+    for(int i = 0; i < 128 / sizeof(unsigned int); ++i) {
+        printf("%d ", ptrI[i]);
+        //printf("%d ", dspDstBuf[i]);
     }
     printf("\n");
     //SaveBMP("./dsp_hvx_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
