@@ -45,7 +45,7 @@ int main(int argc, char **argv)
     int width = 1920;
     int height = 1080;
 
-    int outWidth = 600;
+    int outWidth = 640;
     int outHeight = 360;
 
     unsigned char *image;
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
 
     {
         ccosttime a("pre_process_nv12_ori");
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < 1; ++i) {
             n = pre_process_nv12_ori(dspSrcBuf, srcLen, width, height, dspDstBuf, dstLen, outWidth, outHeight, 0);
         }
     }
@@ -173,10 +173,6 @@ int main(int argc, char **argv)
         printf("pre_process nv12 ori succ!\n");
     }
     SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
-
-    for (int i = 0; i < srcLen; ++i) {
-        dspSrcBuf[i] = 125;
-    }
 
     {
         ccosttime a("pre_process_nv12_hvx");
@@ -195,8 +191,8 @@ int main(int argc, char **argv)
     unsigned short *ptr = (unsigned short *)dspDstBuf;
     unsigned int *ptrI = (unsigned int *)dspDstBuf;
     float* pFloat = (float*)dspDstBuf;
-    for(int i = 0; i < 128 / sizeof(unsigned int); ++i) {
-        printf("%d ", ptrI[i]);
+    for (int i = 0; i < 128 / sizeof(unsigned char); ++i) {
+        printf("%d ", dspDstBuf[i]);
         //printf("%d ", dspDstBuf[i]);
     }
     printf("\n");
