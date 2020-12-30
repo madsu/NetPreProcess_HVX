@@ -185,7 +185,14 @@ int pre_process_nv12_ori(const uint8* pSrc, int pSrcLen, int srcWidth, int srcHe
     return 0;
 }
 
-int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHeight, uint8 *pDst, int pDstLen, int dstWidth, int dstHeight, int rotate)
+static inline size_t alignSize(size_t sz, int n)
+{
+    return (sz + n - 1) & -n;
+}
+
+int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHeight,
+                         uint8 *pDst, int pDstLen, int dstWidth, int dstHeight, int rotate,
+                         uint8 *tmp, int tmpLen)
 {
     const int scale = 1 << 8;
     float xratio = 0;
@@ -200,10 +207,17 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     }
 
     //计算xy在原图上的坐标
-    int *sxAry = (int *)memalign(VLEN, dstWidth * sizeof(int));
-    int *syAry = (int *)memalign(VLEN, dstHeight * sizeof(int));
-    unsigned short *fuAry = (unsigned short *)memalign(VLEN, dstWidth * sizeof(unsigned short));
-    unsigned short *fvAry = (unsigned short *)memalign(VLEN, dstHeight * sizeof(unsigned short));
+    int *sxAry = (int *)tmp; //memalign(VLEN, dstWidth * sizeof(int));
+    tmp += alignSize(dstWidth * sizeof(int), VLEN);
+
+    int *syAry = (int *)tmp; //memalign(VLEN, dstHeight * sizeof(int));
+    tmp += alignSize(dstHeight * sizeof(int), VLEN);
+
+    unsigned short *fuAry = (unsigned short *)tmp; //memalign(VLEN, dstWidth * sizeof(unsigned short));
+    tmp += alignSize(dstWidth * sizeof(unsigned short), VLEN);
+
+    unsigned short *fvAry = (unsigned short *)tmp; //memalign(VLEN, dstHeight * sizeof(unsigned short));
+    tmp += alignSize(dstHeight * sizeof(unsigned short), VLEN);
 
     for (int dx = 0; dx < dstWidth; ++dx) {
         float fx = (float)((dx + 0.5) * xratio - 0.5);
@@ -242,7 +256,7 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     unsigned char *pSrcY = (unsigned char *)pSrc;
     unsigned short *pSrcUV = (unsigned short *)(pSrcY + srcHeight * srcWidth);
 
-    unsigned char *buf = (unsigned char *)memalign(VLEN, sizeof(unsigned char) * VLEN * 12);
+    unsigned char *buf = (unsigned char *)tmp; //memalign(VLEN, sizeof(unsigned char) * VLEN * 12);
     unsigned char *pX0Y0y0 = buf;
     unsigned char *pX1Y0y0 = buf + VLEN * 1;
     unsigned char *pX0Y1y0 = buf + VLEN * 2;
@@ -481,6 +495,7 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
         }
     }
 
+    /*
     if(buf) {
         free(buf);
         buf = NULL;
@@ -505,6 +520,7 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
         free(fvAry);
         fvAry = NULL;
     }
+    */
 
     return 0;
 }

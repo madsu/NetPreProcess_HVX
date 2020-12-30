@@ -38,6 +38,11 @@ void PrintVec(short *vec, unsigned int len)
     printf("\n");
 }
 
+static inline size_t alignSize(size_t sz, int n)
+{
+    return (sz + n - 1) & -n;
+}
+
 int main(int argc, char **argv)
 {
     long long start_time, total_cycles;
@@ -96,7 +101,9 @@ int main(int argc, char **argv)
     int (*func_ptr)(int* test, int len, int64* result);
     int (*pre_process_vec_abs)(int *vec, int vecLen);
     int (*pre_process_nv12_ori)(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHeight, uint8 *pDst, int pDstLen, int dstWidth, int dstHeight, int rotate);
-    int (*pre_process_nv12_hvx)(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHeight, uint8 *pDst, int pDstLen, int dstWidth, int dstHeight, int rotate);
+    int (*pre_process_nv12_hvx)(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHeight,
+                                uint8 *pDst, int pDstLen, int dstWidth, int dstHeight, int rotate,
+                                uint8 *tmp, int tmpLen);
 
     H = dlopen("libpre_process_stub.so", RTLD_NOW);
     if (!H) {
@@ -111,7 +118,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    pre_process_nv12_hvx = (int (*)(const uint8 *, int, int, int, uint8 *, int, int, int, int))dlsym(H, "pre_process_nv12_hvx");
+    pre_process_nv12_hvx = (int (*)(const uint8 *, int, int, int, uint8 *, int, int, int, int, uint8 *, int))dlsym(H, "pre_process_nv12_hvx");
     if (!pre_process_nv12_hvx) {
         printf("---ERROR, pre_process_nv12_hvx not found\n");
         dlclose(H);
@@ -162,7 +169,7 @@ int main(int argc, char **argv)
 
     {
         ccosttime a("pre_process_nv12_ori");
-        for (int i = 0; i < 1; ++i) {
+        for (int i = 0; i < 10; ++i) {
             n = pre_process_nv12_ori(dspSrcBuf, srcLen, width, height, dspDstBuf, dstLen, outWidth, outHeight, 0);
         }
     }
@@ -172,12 +179,28 @@ int main(int argc, char **argv)
     } else {
         printf("pre_process nv12 ori succ!\n");
     }
-    SaveBMP("./dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
+    SaveBMP("/data/local/tmp/HVX_test/dsp_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
+
+    unsigned char *dspDstBuf1 = nullptr;
+    dstLen = sizeof(unsigned char) * outWidth * outHeight * 4;
+    if (0 == (dspDstBuf1 = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, dstLen))) {
+        printf("---Error: alloc dspSrcBuf failed\n");
+        return -1;
+    }
+
+    unsigned char* tmp = nullptr;
+    int tmpLen = alignSize(sizeof(int) * outWidth, 128) + alignSize(sizeof(int) * outHeight, 128) +
+                 alignSize(sizeof(short) * outWidth, 128) + alignSize(sizeof(short) * outHeight, 128) +
+                 alignSize(sizeof(char) * 12 * 128, 128);
+    if (0 == (tmp = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, tmpLen))) {
+        printf("---Error: alloc dspSrcBuf failed\n");
+        return -1;
+    }
 
     {
         ccosttime a("pre_process_nv12_hvx");
-        for (int i = 0; i < 1; ++i) {
-            n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf, dstLen, outWidth, outHeight, 0);
+        for (int i = 0; i < 10; ++i) {
+            n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf1, dstLen, outWidth, outHeight, 0, tmp, tmpLen);
         }
     }
 
@@ -187,16 +210,7 @@ int main(int argc, char **argv)
         printf("pre_process nv12 hvx succ!\n");
     }
 
-    printf("nv12 hvx out: ");
-    unsigned short *ptr = (unsigned short *)dspDstBuf;
-    unsigned int *ptrI = (unsigned int *)dspDstBuf;
-    float* pFloat = (float*)dspDstBuf;
-    for (int i = 0; i < 128 / sizeof(unsigned char); ++i) {
-        printf("%d ", dspDstBuf[i]);
-        //printf("%d ", dspDstBuf[i]);
-    }
-    printf("\n");
-    //SaveBMP("./dsp_hvx_outimg.bmp", dspDstBuf, outWidth, outHeight, 24);
+    SaveBMP("/data/local/tmp/HVX_test/dsp_hvx_outimg.bmp", dspDstBuf1, outWidth, outHeight, 32);
 
     dlclose(H);
 #endif
@@ -211,6 +225,8 @@ FAIL:
         rpcmem_free(dspDstBuf);
     if(testVec)
         rpcmem_free(testVec);
+    if(tmp)
+        rpcmem_free(tmp);
 
     rpcmem_deinit();
     return 0;
