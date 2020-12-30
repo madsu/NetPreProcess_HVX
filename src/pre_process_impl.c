@@ -240,43 +240,46 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     }
 
     unsigned char *pSrcY = (unsigned char *)pSrc;
-    unsigned char *pSrcU = (unsigned char *)(pSrcY + srcHeight * srcWidth);
-    unsigned char *pSrcV = pSrcU + 1;
+    unsigned short *pSrcUV = (unsigned short *)(pSrcY + srcHeight * srcWidth);
 
-    unsigned char *buf = (unsigned char *)memalign(VLEN, sizeof(unsigned char) * VLEN * 12);
+    unsigned char *buf = (unsigned char *)memalign(VLEN, sizeof(unsigned char) * VLEN * 8);
     unsigned char *pX0Y0y = buf;
     unsigned char *pX1Y0y = buf + VLEN * 1;
     unsigned char *pX0Y1y = buf + VLEN * 2;
     unsigned char *pX1Y1y = buf + VLEN * 3;
-    unsigned char *pX0Y0u = buf + VLEN * 4;
-    unsigned char *pX1Y0u = buf + VLEN * 5;
-    unsigned char *pX0Y1u = buf + VLEN * 6;
-    unsigned char *pX1Y1u = buf + VLEN * 7;
-    unsigned char *pX0Y0v = buf + VLEN * 8;
-    unsigned char *pX1Y0v = buf + VLEN * 9;
-    unsigned char *pX0Y1v = buf + VLEN * 10;
-    unsigned char *pX1Y1v = buf + VLEN * 11;
+    unsigned short *pX0Y0uv = (unsigned short *)(buf + VLEN * 4);
+    unsigned short *pX1Y0uv = (unsigned short *)(buf + VLEN * 5);
+    unsigned short *pX0Y1uv = (unsigned short *)(buf + VLEN * 6);
+    unsigned short *pX1Y1uv = (unsigned short *)(buf + VLEN * 7);
     HVX_Vector *vX0Y0y = (HVX_Vector *)(pX0Y0y);
     HVX_Vector *vX1Y0y = (HVX_Vector *)(pX1Y0y);
     HVX_Vector *vX0Y1y = (HVX_Vector *)(pX0Y1y);
     HVX_Vector *vX1Y1y = (HVX_Vector *)(pX1Y1y);
-    HVX_Vector *vX0Y0u = (HVX_Vector *)(pX0Y0u);
-    HVX_Vector *vX1Y0u = (HVX_Vector *)(pX1Y0u);
-    HVX_Vector *vX0Y1u = (HVX_Vector *)(pX0Y1u);
-    HVX_Vector *vX1Y1u = (HVX_Vector *)(pX1Y1u);
-    HVX_Vector *vX0Y0v = (HVX_Vector *)(pX0Y0v);
-    HVX_Vector *vX1Y0v = (HVX_Vector *)(pX1Y0v);
-    HVX_Vector *vX0Y1v = (HVX_Vector *)(pX0Y1v);
-    HVX_Vector *vX1Y1v = (HVX_Vector *)(pX1Y1v);
+    HVX_Vector *vX0Y0uv = (HVX_Vector *)(pX0Y0uv);
+    HVX_Vector *vX1Y0uv = (HVX_Vector *)(pX1Y0uv);
+    HVX_Vector *vX0Y1uv = (HVX_Vector *)(pX0Y1uv);
+    HVX_Vector *vX1Y1uv = (HVX_Vector *)(pX1Y1uv);
+
+    HVX_Vector sUv, sY0, sY1, sV_833u_400, sR, sG, sB, sGE, sGO, sRE, sRO, sBE, sBO, sIffG, sIBR, sIBR2;
+    HVX_VectorPair dUvx2, dY0x2, dY1x2, dY1192a, dY1192b, dY1192c, dU2066v1634, dIffBGR, dIffBGR2;
+    int const_400_833 = ((-400 << 16) + ((-833) & 0xffff));
+    int const1192 = (1192 << 16) + 1192;
+    int const2066n1634 = ((2066 << 16) + 1634);
+    int const10 = 10;
+    int const_1 = -1;
+    HVX_Vector sConst0xff = Q6_V_vsplat_R(0x00ff00ff);
+    HVX_Vector sConst128 = Q6_V_vsplat_R(0x80808080);
+    HVX_Vector sConst16 = Q6_V_vsplat_R(0x10101010);
 
     HVX_Vector vVScaleh = Q6_Vh_vsplat_R(scale);
-    for (int dy = 0; dy < 1; dy++) {
+    HVX_Vector *prgb0 = (HVX_Vector *)pDst;
+    for (int dy = 0; dy < dstHeight; dy++) {
         HVX_Vector vV0uh = Q6_Vh_vsplat_R(fvAry[dy]);
         HVX_Vector vV1uh = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh);
 
         int ii = dstWidth / VLEN;
         int remain = dstWidth & VLEN;
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < ii; i++) {
             int startX = i * VLEN;
             int *startXAry = sxAry + startX;
 
@@ -291,20 +294,15 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
                 pX0Y1y[dx] = pSrcY[sy_ * srcWidth + sx];
                 pX1Y1y[dx] = pSrcY[sy_ * srcWidth + sx_];
 
-                sx -= sx % 2;
-                sx_ -= sx_ % 2;
-                sy = sy / 2;
-                sy_ = sy_ / 2;
+                if (dx % 2 == 0) {
+                    sy = sy / 2;
+                    sy_ = sy_ / 2;
 
-                pX0Y0u[dx] = pSrcU[sy * srcWidth + sx];
-                pX1Y0u[dx] = pSrcU[sy * srcWidth + sx_];
-                pX0Y1u[dx] = pSrcU[sy_ * srcWidth + sx];
-                pX1Y1u[dx] = pSrcU[sy_ * srcWidth + sx_];
-
-                pX0Y0v[dx] = pSrcV[sy * srcWidth + sx];
-                pX1Y0v[dx] = pSrcV[sy * srcWidth + sx_];
-                pX0Y1v[dx] = pSrcV[sy_ * srcWidth + sx];
-                pX1Y1v[dx] = pSrcV[sy_ * srcWidth + sx_];
+                    pX0Y0uv[dx / 2] = pSrcUV[(sy * srcWidth + sx) / 2];
+                    pX1Y0uv[dx / 2] = pSrcUV[(sy * srcWidth + sx_) / 2];
+                    pX0Y1uv[dx / 2] = pSrcUV[(sy_ * srcWidth + sx) / 2];
+                    pX1Y1uv[dx / 2] = pSrcUV[(sy_ * srcWidth + sx_) / 2];
+                }
             }
 
             //Load fu
@@ -337,10 +335,10 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
             HVX_Vector resY0 = Q6_Vub_vsat_VhVh(s0, s1);
 
             //compute U
-            wX0Y0h = Q6_Wuh_vzxt_Vub(vX0Y0u[0]);
-            wX1Y0h = Q6_Wuh_vzxt_Vub(vX1Y0u[0]);
-            wX0Y1h = Q6_Wuh_vzxt_Vub(vX0Y1u[0]);
-            wX1Y1h = Q6_Wuh_vzxt_Vub(vX1Y1u[0]);
+            wX0Y0h = Q6_Wuh_vzxt_Vub(vX0Y0uv[0]);
+            wX1Y0h = Q6_Wuh_vzxt_Vub(vX1Y0uv[0]);
+            wX0Y1h = Q6_Wuh_vzxt_Vub(vX0Y1uv[0]);
+            wX1Y1h = Q6_Wuh_vzxt_Vub(vX1Y1uv[0]);
 
             s00H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_hi_W(wX0Y0h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_hi_W(wX1Y0h)));
             s00L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_lo_W(wX0Y0h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_lo_W(wX1Y0h)));
@@ -355,28 +353,53 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
             s00L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vV1uh, s0L), Q6_Wuw_vmpy_VuhVuh(vV0uh, s1L));
             s0 = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00H), Q6_V_lo_W(s00H), 8);
             s1 = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00L), Q6_V_lo_W(s00L), 8);
-            HVX_Vector resU = Q6_Vub_vsat_VhVh(s0, s1);
+            HVX_Vector resUV = Q6_Vub_vsat_VhVh(s0, s1);
 
-            //compute V
-            wX0Y0h = Q6_Wuh_vzxt_Vub(vX0Y0v[0]);
-            wX1Y0h = Q6_Wuh_vzxt_Vub(vX1Y0v[0]);
-            wX0Y1h = Q6_Wuh_vzxt_Vub(vX0Y1v[0]);
-            wX1Y1h = Q6_Wuh_vzxt_Vub(vX1Y1v[0]);
+            sUv = Q6_Vb_vshuff_Vb(resUV);
+            dUvx2 = Q6_Wh_vsub_VubVub(sUv, sConst128);
+            sV_833u_400 = Q6_Vw_vdmpy_VhRh_sat(Q6_V_lo_W(dUvx2), const_400_833);
+            dU2066v1634 = Q6_Ww_vmpy_VhRh(Q6_V_lo_W(dUvx2), const2066n1634);
 
-            s00H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_hi_W(wX0Y0h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_hi_W(wX1Y0h)));
-            s00L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_lo_W(wX0Y0h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_lo_W(wX1Y0h)));
-            s01H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_hi_W(wX0Y1h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_hi_W(wX1Y1h)));
-            s01L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_lo_W(wX0Y1h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_lo_W(wX1Y1h)));
-            s0H = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00H), Q6_V_lo_W(s00H), 8);
-            s0L = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00L), Q6_V_lo_W(s00L), 8);
-            s1H = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s01H), Q6_V_lo_W(s01H), 8);
-            s1L = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s01L), Q6_V_lo_W(s01L), 8);
+            sY0 = Q6_Vub_vsub_VubVub_sat(resY0, sConst16);
+            dY0x2 = Q6_Wuh_vunpack_Vub(sY0);
 
-            s00H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vV1uh, s0H), Q6_Wuw_vmpy_VuhVuh(vV0uh, s1H));
-            s00L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vV1uh, s0L), Q6_Wuw_vmpy_VuhVuh(vV0uh, s1L));
-            s0 = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00H), Q6_V_lo_W(s00H), 8);
-            s1 = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00L), Q6_V_lo_W(s00L), 8);
-            HVX_Vector resV = Q6_Vub_vsat_VhVh(s0, s1);
+            dY1192a = Q6_Wuw_vmpy_VuhRuh(Q6_V_lo_W(dY0x2), const1192);
+            sGE = Q6_Vw_vadd_VwVw(Q6_V_lo_W(dY1192a), sV_833u_400);
+            sGO = Q6_Vw_vadd_VwVw(Q6_V_hi_W(dY1192a), sV_833u_400);
+            sRE = Q6_Vw_vadd_VwVw(Q6_V_lo_W(dY1192a), Q6_V_lo_W(dU2066v1634));
+            sRO = Q6_Vw_vadd_VwVw(Q6_V_hi_W(dY1192a), Q6_V_lo_W(dU2066v1634));
+            sBE = Q6_Vw_vadd_VwVw(Q6_V_lo_W(dY1192a), Q6_V_hi_W(dU2066v1634));
+            sBO = Q6_Vw_vadd_VwVw(Q6_V_hi_W(dY1192a), Q6_V_hi_W(dU2066v1634));
+            sG = Q6_Vuh_vasr_VwVwR_sat(sGO, sGE, const10);
+            sR = Q6_Vuh_vasr_VwVwR_sat(sRO, sRE, const10);
+            sB = Q6_Vuh_vasr_VwVwR_sat(sBO, sBE, const10);
+            sIffG = Q6_Vub_vsat_VhVh(sConst0xff, sG);
+            sIBR = Q6_Vub_vsat_VhVh(sB, sR);
+            dIffBGR = Q6_W_vshuff_VVR(sIffG, sIBR, const_1);
+            *prgb0++ = Q6_V_lo_W(dIffBGR);
+            *prgb0++ = Q6_V_hi_W(dIffBGR);
+
+            sV_833u_400 = Q6_Vw_vdmpy_VhRh_sat(Q6_V_hi_W(dUvx2), const_400_833);
+            dU2066v1634 = Q6_Ww_vmpy_VhRh(Q6_V_hi_W(dUvx2), const2066n1634);
+
+            dY1192b = Q6_Wuw_vmpy_VuhRuh(Q6_V_hi_W(dY0x2), const1192);
+            sGE = Q6_Vw_vadd_VwVw(Q6_V_lo_W(dY1192b), sV_833u_400);
+            sGO = Q6_Vw_vadd_VwVw(Q6_V_hi_W(dY1192b), sV_833u_400);
+            sRE = Q6_Vw_vadd_VwVw(Q6_V_lo_W(dY1192b), Q6_V_lo_W(dU2066v1634));
+            sRO = Q6_Vw_vadd_VwVw(Q6_V_hi_W(dY1192b), Q6_V_lo_W(dU2066v1634));
+            sBE = Q6_Vw_vadd_VwVw(Q6_V_lo_W(dY1192b), Q6_V_hi_W(dU2066v1634));
+            sBO = Q6_Vw_vadd_VwVw(Q6_V_hi_W(dY1192b), Q6_V_hi_W(dU2066v1634));
+            sG = Q6_Vuh_vasr_VwVwR_sat(sGO, sGE, const10);
+            sR = Q6_Vuh_vasr_VwVwR_sat(sRO, sRE, const10);
+            sB = Q6_Vuh_vasr_VwVwR_sat(sBO, sBE, const10);
+            sG = Q6_Vh_vmin_VhVh(sG, sConst0xff);
+            sR = Q6_Vh_vmin_VhVh(sR, sConst0xff);
+            sB = Q6_Vh_vmin_VhVh(sB, sConst0xff);
+            sIffG = Q6_Vb_vshuffe_VbVb(sConst0xff, sG);
+            sIBR = Q6_Vb_vshuffe_VbVb(sB, sR);
+            dIffBGR = Q6_W_vshuff_VVR(sIffG, sIBR, const_1);
+            *prgb0++ = Q6_V_lo_W(dIffBGR);
+            *prgb0++ = Q6_V_hi_W(dIffBGR);
         }
     }
 
