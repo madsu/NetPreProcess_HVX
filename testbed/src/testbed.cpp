@@ -50,8 +50,8 @@ int main(int argc, char **argv)
     int width = 1920;
     int height = 1080;
 
-    int outWidth = 640;
-    int outHeight = 360;
+    int outWidth = 481;
+    int outHeight = 289;
 
     unsigned char *image;
     LoadYUV(argv[1], width, height, &image);
@@ -62,7 +62,8 @@ int main(int argc, char **argv)
 
     nv12_pre_process(image, width, height, dstImage, outWidth, outHeight, 0);
 
-    SaveBMP("./cpu_outimg.bmp", dstImage, outWidth, outHeight, 24);
+    printf("save cpu bmp\n");
+    SaveBMP("/data/local/tmp/HVX_test/cpu_outimg.bmp", dstImage, outWidth, outHeight, 24);
 
     rpcmem_init();
 
