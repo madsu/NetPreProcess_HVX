@@ -47,9 +47,9 @@ int pre_process_nv12_ori(const uint8* pSrc, int pSrcLen, int srcWidth, int srcHe
         {
             int dx, dy;
 
-            const unsigned char *ptrList[3];
+            const uint8_t *ptrList[3];
             int stepList[3];
-            unsigned char ret[3];
+            uint8_t ret[3];
 
             stepList[0] = srcWidth;
             stepList[1] = srcWidth;
@@ -97,7 +97,7 @@ int pre_process_nv12_ori(const uint8* pSrc, int pSrcLen, int srcWidth, int srcHe
 
             for (int chn = 0; chn < 3; chn++)
             {
-                const unsigned char *ptr = ptrList[chn];
+                const uint8_t *ptr = ptrList[chn];
                 int step = stepList[chn];
 
                 float sx = (dx + 0.5f) * (float)xratio - 0.5f;
@@ -143,10 +143,10 @@ int pre_process_nv12_ori(const uint8* pSrc, int pSrcLen, int srcWidth, int srcHe
                     y_ /= 2;
                 }
 
-                unsigned char data00 = ptr[y * step + x];
-                unsigned char data10 = ptr[y * step + x_];
-                unsigned char data01 = ptr[y_ * step + x];
-                unsigned char data11 = ptr[y_ * step + x_];
+                uint8_t data00 = ptr[y * step + x];
+                uint8_t data10 = ptr[y * step + x_];
+                uint8_t data01 = ptr[y_ * step + x];
+                uint8_t data11 = ptr[y_ * step + x_];
 
                 float var = v1 * (u1 * data00 + u * data10) + v * (u1 * data01 + u * data11);
                 if (var < 0)
@@ -154,11 +154,11 @@ int pre_process_nv12_ori(const uint8* pSrc, int pSrcLen, int srcWidth, int srcHe
                 if (var > 255)
                     var = 255;
 
-                ret[chn] = (unsigned char)var;
+                ret[chn] = (uint8_t)var;
             }
 
             //nv21 -> bgr
-            unsigned char y, u, v;
+            uint8_t y, u, v;
             int r, g, b;
             y = ret[0];
             u = ret[1];
@@ -182,9 +182,9 @@ int pre_process_nv12_ori(const uint8* pSrc, int pSrcLen, int srcWidth, int srcHe
                 b = 0;
 
             int dst_idx = j * dstWidth * 3 + i * 3;
-            pDst[dst_idx] = (unsigned char)b;
-            pDst[dst_idx + 1] = (unsigned char)g;
-            pDst[dst_idx + 2] = (unsigned char)r;
+            pDst[dst_idx] = (uint8_t)b;
+            pDst[dst_idx + 1] = (uint8_t)g;
+            pDst[dst_idx + 2] = (uint8_t)r;
         }
     }
     return 0;
@@ -237,8 +237,8 @@ typedef struct
 
     int *sxAry;
     int *syAry;
-    unsigned short *fuAry;
-    unsigned short *fvAry;
+    uint16_t *fuAry;
+    uint16_t *fvAry;
 } nv12hvx_callback_t;
 
 static void pre_process_nv12_callback(void* data)
@@ -254,29 +254,29 @@ static void pre_process_nv12_callback(void* data)
     int32_t dstHeight = dptr->dstHeight;
     int *sxAry = dptr->sxAry;
     int *syAry = dptr->syAry;
-    unsigned short *fuAry = dptr->fuAry;
-    unsigned short *fvAry = dptr->fvAry;
+    uint16_t *fuAry = dptr->fuAry;
+    uint16_t *fvAry = dptr->fvAry;
 
     int32_t srcSlice = srcHeight / dptr->threadCount;
     int32_t dstSlice = dstHeight / dptr->threadCount;
     const int scale = 1 << 8;
-    unsigned char *pSrcY = (unsigned char *)(pSrcImg + tid * srcSlice * srcWidth);
-    unsigned short *pSrcUV = (unsigned short *)(pSrcImg + srcHeight * srcWidth + tid * srcSlice * srcWidth / 2);
+    uint8_t *pSrcY = (uint8_t *)(pSrcImg + tid * srcSlice * srcWidth);
+    uint16_t *pSrcUV = (uint16_t *)(pSrcImg + srcHeight * srcWidth + tid * srcSlice * srcWidth / 2);
     uint8_t *pDst = pDstImg + tid * dstSlice * dstWidth * 4;
 
-    unsigned char *buf = (unsigned char *)memalign(VECLEN, sizeof(unsigned char) * VECLEN * 12);
-    unsigned char *pX0Y0y0 = buf;
-    unsigned char *pX1Y0y0 = buf + VECLEN * 1;
-    unsigned char *pX0Y1y0 = buf + VECLEN * 2;
-    unsigned char *pX1Y1y0 = buf + VECLEN * 3;
-    unsigned char *pX0Y0y1 = buf + VECLEN * 4;
-    unsigned char *pX1Y0y1 = buf + VECLEN * 5;
-    unsigned char *pX0Y1y1 = buf + VECLEN * 6;
-    unsigned char *pX1Y1y1 = buf + VECLEN * 7;
-    unsigned short *pX0Y0uv = (unsigned short *)(buf + VECLEN * 8);
-    unsigned short *pX1Y0uv = (unsigned short *)(buf + VECLEN * 9);
-    unsigned short *pX0Y1uv = (unsigned short *)(buf + VECLEN * 10);
-    unsigned short *pX1Y1uv = (unsigned short *)(buf + VECLEN * 11);
+    uint8_t *buf = (uint8_t *)memalign(VECLEN, sizeof(uint8_t) * VECLEN * 12);
+    uint8_t *pX0Y0y0 = buf;
+    uint8_t *pX1Y0y0 = buf + VECLEN * 1;
+    uint8_t *pX0Y1y0 = buf + VECLEN * 2;
+    uint8_t *pX1Y1y0 = buf + VECLEN * 3;
+    uint8_t *pX0Y0y1 = buf + VECLEN * 4;
+    uint8_t *pX1Y0y1 = buf + VECLEN * 5;
+    uint8_t *pX0Y1y1 = buf + VECLEN * 6;
+    uint8_t *pX1Y1y1 = buf + VECLEN * 7;
+    uint16_t *pX0Y0uv = (uint16_t *)(buf + VECLEN * 8);
+    uint16_t *pX1Y0uv = (uint16_t *)(buf + VECLEN * 9);
+    uint16_t *pX0Y1uv = (uint16_t *)(buf + VECLEN * 10);
+    uint16_t *pX1Y1uv = (uint16_t *)(buf + VECLEN * 11);
     HVX_Vector *vX0Y0y0 = (HVX_Vector *)(pX0Y0y0);
     HVX_Vector *vX1Y0y0 = (HVX_Vector *)(pX1Y0y0);
     HVX_Vector *vX0Y1y0 = (HVX_Vector *)(pX0Y1y0);
@@ -540,11 +540,11 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     int *syAry = (int *)tmp; //memalign(VLEN, dstHeight * sizeof(int));
     tmp += alignSize(dstHeight * sizeof(int), VECLEN);
 
-    unsigned short *fuAry = (unsigned short *)tmp; //memalign(VLEN, dstWidth * sizeof(unsigned short));
-    tmp += alignSize(dstWidth * sizeof(unsigned short), VECLEN);
+    uint16_t *fuAry = (uint16_t *)tmp; //memalign(VLEN, dstWidth * sizeof(uint16_t));
+    tmp += alignSize(dstWidth * sizeof(uint16_t), VECLEN);
 
-    unsigned short *fvAry = (unsigned short *)tmp; //memalign(VLEN, dstHeight * sizeof(unsigned short));
-    tmp += alignSize(dstHeight * sizeof(unsigned short), VECLEN);
+    uint16_t *fvAry = (uint16_t *)tmp; //memalign(VLEN, dstHeight * sizeof(uint16_t));
+    tmp += alignSize(dstHeight * sizeof(uint16_t), VECLEN);
 
     for (int dx = 0; dx < dstWidth; ++dx)
     {
@@ -564,7 +564,7 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
         }
 
         sxAry[dx] = x;
-        fuAry[dx] = (unsigned short)(u * scale);
+        fuAry[dx] = (uint16_t)(u * scale);
     }
 
     for (int dy = 0; dy < dstHeight; ++dy)
@@ -585,7 +585,7 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
         }
 
         syAry[dy] = y;
-        fvAry[dy] = (unsigned short)(v * scale);
+        fvAry[dy] = (uint16_t)(v * scale);
     }
 
     dspCV_worker_job_t job;
@@ -646,11 +646,11 @@ int pre_process_nv12_hvx_ttt(const uint8 *pSrc, int pSrcLen, int srcWidth, int s
     int *syAry = (int *)tmp; //memalign(VLEN, dstHeight * sizeof(int));
     tmp += alignSize(dstHeight * sizeof(int), VECLEN);
 
-    unsigned short *fuAry = (unsigned short *)tmp; //memalign(VLEN, dstWidth * sizeof(unsigned short));
-    tmp += alignSize(dstWidth * sizeof(unsigned short), VECLEN);
+    uint16_t *fuAry = (uint16_t *)tmp; //memalign(VLEN, dstWidth * sizeof(uint16_t));
+    tmp += alignSize(dstWidth * sizeof(uint16_t), VECLEN);
 
-    unsigned short *fvAry = (unsigned short *)tmp; //memalign(VLEN, dstHeight * sizeof(unsigned short));
-    tmp += alignSize(dstHeight * sizeof(unsigned short), VECLEN);
+    uint16_t *fvAry = (uint16_t *)tmp; //memalign(VLEN, dstHeight * sizeof(uint16_t));
+    tmp += alignSize(dstHeight * sizeof(uint16_t), VECLEN);
 
     for (int dx = 0; dx < dstWidth; ++dx) {
         float fx = (float)((dx + 0.5) * xratio - 0.5);
@@ -666,7 +666,7 @@ int pre_process_nv12_hvx_ttt(const uint8 *pSrc, int pSrcLen, int srcWidth, int s
         }
 
         sxAry[dx] = x;
-        fuAry[dx] = (unsigned short)(u * scale);
+        fuAry[dx] = (uint16_t)(u * scale);
     }
 
     for (int dy = 0; dy < dstHeight; ++dy) {
@@ -683,25 +683,25 @@ int pre_process_nv12_hvx_ttt(const uint8 *pSrc, int pSrcLen, int srcWidth, int s
         }
 
         syAry[dy] = y;
-        fvAry[dy] = (unsigned short)(v * scale);
+        fvAry[dy] = (uint16_t)(v * scale);
     }
 
-    unsigned char *pSrcY = (unsigned char *)pSrc;
-    unsigned short *pSrcUV = (unsigned short *)(pSrcY + srcHeight * srcWidth);
+    uint8_t *pSrcY = (uint8_t *)pSrc;
+    uint16_t *pSrcUV = (uint16_t *)(pSrcY + srcHeight * srcWidth);
 
-    unsigned char *buf = (unsigned char *)tmp; //memalign(VLEN, sizeof(unsigned char) * VLEN * 12);
-    unsigned char *pX0Y0y0 = buf;
-    unsigned char *pX1Y0y0 = buf + VECLEN * 1;
-    unsigned char *pX0Y1y0 = buf + VECLEN * 2;
-    unsigned char *pX1Y1y0 = buf + VECLEN * 3;
-    unsigned char *pX0Y0y1 = buf + VECLEN * 4;
-    unsigned char *pX1Y0y1 = buf + VECLEN * 5;
-    unsigned char *pX0Y1y1 = buf + VECLEN * 6;
-    unsigned char *pX1Y1y1 = buf + VECLEN * 7;
-    unsigned short *pX0Y0uv = (unsigned short *)(buf + VECLEN * 8);
-    unsigned short *pX1Y0uv = (unsigned short *)(buf + VECLEN * 9);
-    unsigned short *pX0Y1uv = (unsigned short *)(buf + VECLEN * 10);
-    unsigned short *pX1Y1uv = (unsigned short *)(buf + VECLEN * 11);
+    uint8_t *buf = (uint8_t *)tmp; //memalign(VLEN, sizeof(uint8_t) * VLEN * 12);
+    uint8_t *pX0Y0y0 = buf;
+    uint8_t *pX1Y0y0 = buf + VECLEN * 1;
+    uint8_t *pX0Y1y0 = buf + VECLEN * 2;
+    uint8_t *pX1Y1y0 = buf + VECLEN * 3;
+    uint8_t *pX0Y0y1 = buf + VECLEN * 4;
+    uint8_t *pX1Y0y1 = buf + VECLEN * 5;
+    uint8_t *pX0Y1y1 = buf + VECLEN * 6;
+    uint8_t *pX1Y1y1 = buf + VECLEN * 7;
+    uint16_t *pX0Y0uv = (uint16_t *)(buf + VECLEN * 8);
+    uint16_t *pX1Y0uv = (uint16_t *)(buf + VECLEN * 9);
+    uint16_t *pX0Y1uv = (uint16_t *)(buf + VECLEN * 10);
+    uint16_t *pX1Y1uv = (uint16_t *)(buf + VECLEN * 11);
     HVX_Vector *vX0Y0y0 = (HVX_Vector *)(pX0Y0y0);
     HVX_Vector *vX1Y0y0 = (HVX_Vector *)(pX1Y0y0);
     HVX_Vector *vX0Y1y0 = (HVX_Vector *)(pX0Y1y0);
