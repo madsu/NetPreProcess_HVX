@@ -8,5 +8,5 @@
 #if !defined(LOG2VLEN)
 #define         LOG2VLEN    7
 #endif
-#define         VLEN        (1<<LOG2VLEN)
+#define         VECLEN        (1<<LOG2VLEN)
 
