@@ -2,8 +2,6 @@
 #ifndef PRE_PROCESS_IDL
 #define PRE_PROCESS_IDL
 
-#include "AEEStdDef.idl"
-
 interface pre_process {
    long vec_abs(inrout sequence<long> vec);
    long sum(in sequence<long> vec, rout long long res);

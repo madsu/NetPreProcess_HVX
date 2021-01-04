@@ -8,6 +8,11 @@
 #include "net_pre_process.h"
 #include "rpcmem.h"
 
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+using namespace cv;
+
 class ccosttime
 {
 public:
@@ -38,10 +43,12 @@ void PrintVec(short *vec, unsigned int len)
     printf("\n");
 }
 
+/*
 static inline size_t alignSize(size_t sz, int n)
 {
     return (sz + n - 1) & -n;
 }
+*/
 
 int main(int argc, char **argv)
 {
@@ -211,7 +218,8 @@ int main(int argc, char **argv)
         printf("pre_process nv12 hvx succ!\n");
     }
 
-    SaveBMP("/data/local/tmp/HVX_test/dsp_hvx_outimg.bmp", dspDstBuf1, outWidth, outHeight, 32);
+    cv::Mat img(outHeight, outWidth, CV_8UC4, dspDstBuf1);
+    cv::imwrite("/data/local/tmp/HVX_test/dsp_hvx_outimg.bmp", img);
 
     dlclose(H);
 #endif

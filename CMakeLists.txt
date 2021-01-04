@@ -33,9 +33,9 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
         PUBLIC VERIFY_PRINT_ERROR
     )
 
-    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE -llog")
-    SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fPIE -llog")
-    SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS}  -fPIE -pie -llog")
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE")
+    SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fPIE")
+    SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS}  -fPIE -pie")
 
     message(STATUS "ANDROID_NDK_REVISION:${ANDROID_NDK_REVISION}")
     message(STATUS "ANDROID_NDK_RELEASE:${ANDROID_NDK_RELEASE}")
@@ -49,6 +49,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
     endif()
 
     set(incs
+        ${CMAKE_CURRENT_SOURCE_DIR}/otherlibs/opencv/inc
         ${CMAKE_CURRENT_SOURCE_DIR}/src/
         ${CMAKE_CURRENT_BINARY_DIR}/
         )
@@ -98,7 +99,8 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
 
     add_dependencies(${PROJECT_NAME} ${LIB_NAME} rpcmem)
 
-    target_link_libraries( ${PROJECT_NAME} ${EXTRA_LIBS} m )
+    target_link_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/otherlibs/opencv/libs/android_arm64-v8a)
+    target_link_libraries( ${PROJECT_NAME} ${EXTRA_LIBS} m z log jnigraphics mediandk opencv_java4)
 
 elseif(BUILD_DSP_SHARED)
     aux_source_directory(${CMAKE_SOURCE_DIR}/src LIB_SRCS)
