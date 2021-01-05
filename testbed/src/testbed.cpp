@@ -7,6 +7,7 @@
 #include "loadimg.h"
 #include "net_pre_process.h"
 #include "rpcmem.h"
+#include "rgba2bgr.h"
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -169,6 +170,7 @@ int main(int argc, char **argv)
         ccosttime a("pre_process_nv12_hvx");
         for (int i = 0; i < 10; ++i) {
             n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf1, dstLen, outWidth, outHeight, 0, tmp, tmpLen);
+            RGBA2BGR(dspDstBuf1, outWidth, outHeight, outStride, dspDstBuf);
         }
     }
 
@@ -178,7 +180,7 @@ int main(int argc, char **argv)
         printf("pre_process nv12 hvx succ!\n");
     }
 
-    cv::Mat img(outHeight, outStride / 4, CV_8UC4, dspDstBuf1);
+    cv::Mat img(outHeight, outWidth, CV_8UC3, dspDstBuf);
     cv::imwrite("/data/local/tmp/HVX_test/hvx_outimg.bmp", img);
 
     dlclose(H);
