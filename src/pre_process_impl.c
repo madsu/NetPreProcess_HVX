@@ -265,14 +265,10 @@ static void pre_process_nv12_callback(void *data)
     uint8_t *pX1Y0y1 = buf + VECLEN * 5;
     uint8_t *pX0Y1y1 = buf + VECLEN * 6;
     uint8_t *pX1Y1y1 = buf + VECLEN * 7;
-    uint16_t *pX0Y0uv = (uint16_t *)(buf + VECLEN * 8);
-    uint16_t *pX1Y0uv = (uint16_t *)(buf + VECLEN * 9);
-    uint16_t *pX0Y1uv = (uint16_t *)(buf + VECLEN * 10);
-    uint16_t *pX1Y1uv = (uint16_t *)(buf + VECLEN * 11);
-    uint8 *pX0Y0u = (uint8 *)(buf + VECLEN * 8);
-    uint8 *pX0Y1u = (uint8 *)(buf + VECLEN * 9);
-    uint8 *pX1Y0u = (uint8 *)(buf + VECLEN * 10);
-    uint8 *pX1Y1u = (uint8 *)(buf + VECLEN * 11);
+    uint8_t *pX0Y0uv = buf + VECLEN * 8;
+    uint8_t *pX0Y1uv = buf + VECLEN * 9;
+    uint8_t *pX1Y0uv = buf + VECLEN * 10;
+    uint8_t *pX1Y1uv = buf + VECLEN * 11;
     HVX_Vector *vX0Y0y0 = (HVX_Vector *)(pX0Y0y0);
     HVX_Vector *vX1Y0y0 = (HVX_Vector *)(pX1Y0y0);
     HVX_Vector *vX0Y1y0 = (HVX_Vector *)(pX0Y1y0);
@@ -337,16 +333,15 @@ static void pre_process_nv12_callback(void *data)
                 sx -= sx % 2;
                 sx_ -= sx_ % 2;
                 if (dx % 2 == 0) {
-                    pX0Y0u[dx] = pSrcU[su0 * srcWidth + sx];
-                    pX1Y0u[dx] = pSrcU[su0 * srcWidth + sx_];
-                    pX0Y1u[dx] = pSrcU[su0_ * srcWidth + sx];
-                    pX1Y1u[dx] = pSrcU[su0_ * srcWidth + sx_];
-                }
-                else {
-                    pX0Y0u[dx] = pSrcV[su0 * srcWidth + sx];
-                    pX1Y0u[dx] = pSrcV[su0 * srcWidth + sx_];
-                    pX0Y1u[dx] = pSrcV[su0_ * srcWidth + sx];
-                    pX1Y1u[dx] = pSrcV[su0_ * srcWidth + sx_];
+                    pX0Y0uv[dx] = pSrcU[su0 * srcWidth + sx];
+                    pX1Y0uv[dx] = pSrcU[su0 * srcWidth + sx_];
+                    pX0Y1uv[dx] = pSrcU[su0_ * srcWidth + sx];
+                    pX1Y1uv[dx] = pSrcU[su0_ * srcWidth + sx_];
+                } else {
+                    pX0Y0uv[dx] = pSrcV[su0 * srcWidth + sx];
+                    pX1Y0uv[dx] = pSrcV[su0 * srcWidth + sx_];
+                    pX0Y1uv[dx] = pSrcV[su0_ * srcWidth + sx];
+                    pX1Y1uv[dx] = pSrcV[su0_ * srcWidth + sx_];
                 }
             }
 
@@ -537,16 +532,15 @@ static void pre_process_nv12_callback(void *data)
                 sx -= sx % 2;
                 sx_ -= sx_ % 2;
                 if (dx % 2 == 0) {
-                    pX0Y0u[dx] = pSrcU[su0 * srcWidth + sx];
-                    pX1Y0u[dx] = pSrcU[su0 * srcWidth + sx_];
-                    pX0Y1u[dx] = pSrcU[su0_ * srcWidth + sx];
-                    pX1Y1u[dx] = pSrcU[su0_ * srcWidth + sx_];
-                }
-                else {
-                    pX0Y0u[dx] = pSrcV[su0 * srcWidth + sx];
-                    pX1Y0u[dx] = pSrcV[su0 * srcWidth + sx_];
-                    pX0Y1u[dx] = pSrcV[su0_ * srcWidth + sx];
-                    pX1Y1u[dx] = pSrcV[su0_ * srcWidth + sx_];
+                    pX0Y0uv[dx] = pSrcU[su0 * srcWidth + sx];
+                    pX1Y0uv[dx] = pSrcU[su0 * srcWidth + sx_];
+                    pX0Y1uv[dx] = pSrcU[su0_ * srcWidth + sx];
+                    pX1Y1uv[dx] = pSrcU[su0_ * srcWidth + sx_];
+                } else {
+                    pX0Y0uv[dx] = pSrcV[su0 * srcWidth + sx];
+                    pX1Y0uv[dx] = pSrcV[su0 * srcWidth + sx_];
+                    pX0Y1uv[dx] = pSrcV[su0_ * srcWidth + sx];
+                    pX1Y1uv[dx] = pSrcV[su0_ * srcWidth + sx_];
                 }
             }
 
