@@ -199,11 +199,6 @@ static int setClocks()
     return 0;
 }
 
-static inline size_t alignSize(size_t sz, int n)
-{
-    return (sz + n - 1) & -n;
-}
-
 typedef struct
 {
     dspCV_synctoken_t *token;
@@ -211,7 +206,7 @@ typedef struct
     int32_t threadIdx;
     int32_t threadCount;
 
-    uint8_t *pSrcImg;
+    const uint8_t *pSrcImg;
     int32_t srcWidth;
     int32_t srcHeight;
     uint8_t *pDstImg;
@@ -251,7 +246,7 @@ static void pre_process_nv12_callback(void *data)
     uint8_t *pSrcY = (uint8_t *)(pSrcImg + tid * srcRows * srcWidth);
     unsigned char *pSrcU = (unsigned char *)(pSrcImg + srcHeight * srcWidth + tid * srcRows * srcWidth / 2);
     unsigned char *pSrcV = pSrcU + 1;
-    int dstPadWidth = alignSize(dstWidth, VECLEN);
+    int dstPadWidth = roundup_t(dstWidth, VECLEN);
     int dstStride = dstPadWidth * 4;
     uint8_t *pDst = pDstImg + tid * dstRows * dstStride;
 
@@ -317,9 +312,9 @@ static void pre_process_nv12_callback(void *data)
 
         HVX_Vector *prgb0 = (HVX_Vector *)(pDst + dy * dstStride);
         HVX_Vector *prgb1 = (HVX_Vector *)(pDst + (dy + 1) * dstStride);
-        L2fetch(pSrcY + sy0 * srcWidth, L2FETCH_PARA);
-        L2fetch(pSrcY + sy1 * srcWidth, L2FETCH_PARA);
-        L2fetch(pSrcU + su0 * srcWidth, L2FETCH_PARA);
+        L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
+        L2fetch((unsigned int)(pSrcY + sy1 * srcWidth), L2FETCH_PARA);
+        L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
 
         int32_t dx = 0;
         int32_t nnX = dstWidth / VECLEN;
@@ -706,8 +701,8 @@ static void pre_process_nv12_callback(void *data)
         HVX_Vector vV1uh1 = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh1);
 
         HVX_Vector *prgb0 = (HVX_Vector *)(pDst + dy * dstStride);
-        L2fetch(pSrcY + sy0 * srcWidth, L2FETCH_PARA);
-        L2fetch(pSrcU + su0 * srcWidth, L2FETCH_PARA);
+        L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
+        L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
 
         int32_t dx = 0;
         int32_t nnX = dstWidth / VECLEN;
@@ -1001,20 +996,20 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     }
 
     //计算xy在原图上的坐标
-    const int scale = 1 << 8;
     uint8_t *ptr = (uint8_t *)vtcm;
     int *sxAry = (int *)ptr;
-    ptr += alignSize(dstWidth * sizeof(int), VECLEN);
+    ptr += roundup_t(dstWidth * sizeof(int), VECLEN);
 
     int *syAry = (int *)ptr;
-    ptr += alignSize(dstHeight * sizeof(int), VECLEN);
+    ptr += roundup_t(dstHeight * sizeof(int), VECLEN);
 
     uint16_t *fuAry = (uint16_t *)ptr;
-    ptr += alignSize(dstWidth * sizeof(uint16_t), VECLEN);
+    ptr += roundup_t(dstWidth * sizeof(uint16_t), VECLEN);
 
     uint16_t *fvAry = (uint16_t *)ptr;
-    ptr += alignSize(dstHeight * sizeof(uint16_t), VECLEN);
+    ptr += roundup_t(dstHeight * sizeof(uint16_t), VECLEN);
 
+    const int scale = 1 << 8;
     for (int dx = 0; dx < dstWidth; ++dx) {
         float fx = (float)((dx + 0.5) * xratio - 0.5);
 
