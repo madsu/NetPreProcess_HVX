@@ -96,19 +96,13 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    int *testVec = (int *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, sizeof(int) * 1024);
-    for (int i = 0; i < 1024; ++i) {
-        testVec[i] = i - 1024;
-    }
-
 #ifdef __hexagon__
     pre_process_vec_abs(testVec, 1024);
 
     //pre_process_nv12_hvx(dspSrcBuf, width, height, dspDstBuf, outWidth, outHeight, 0);
 #else
     void* H = nullptr;
-    using func0 = int (*)(const uint8 *, int, int, int, uint8 *, int, int, int, int);
-    using func1 = int (*)(const uint8 *, int, int, int, uint8 *, int, int, int, int, uint8 *, int);
+    using func_ptr = int (*)(const uint8 *, int, int, int, uint8 *, int, int, int, int);
 
     H = dlopen("libpre_process_stub.so", RTLD_NOW);
     if (!H) {
@@ -116,7 +110,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    func0 pre_process_nv12_ori = reinterpret_cast<func0>(dlsym(H, "pre_process_nv12_ori"));
+    func_ptr pre_process_nv12_ori = reinterpret_cast<func_ptr>(dlsym(H, "pre_process_nv12_ori"));
     if (!pre_process_nv12_ori)
     {
         printf("---ERROR, pre_process_nv12_hvx not found\n");
@@ -124,7 +118,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    func1 pre_process_nv12_hvx = reinterpret_cast<func1>(dlsym(H, "pre_process_nv12_hvx"));
+    func_ptr pre_process_nv12_hvx = reinterpret_cast<func_ptr>(dlsym(H, "pre_process_nv12_hvx"));
     if (!pre_process_nv12_hvx) {
         printf("---ERROR, pre_process_nv12_hvx not found\n");
         dlclose(H);
@@ -151,17 +145,8 @@ int main(int argc, char **argv)
 
     unsigned char *dspDstBuf1 = nullptr;
     int outStride = alignSize(outWidth, 128) * 4;
-    printf("linebytes=%d\n", outStride);
     dstLen = sizeof(unsigned char) * outStride * outHeight;
     if (0 == (dspDstBuf1 = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, dstLen))) {
-        printf("---Error: alloc dspSrcBuf failed\n");
-        return -1;
-    }
-
-    unsigned char* tmp = nullptr;
-    int tmpLen = alignSize(sizeof(int) * outWidth, 128) + alignSize(sizeof(int) * outHeight, 128) +
-                 alignSize(sizeof(short) * outWidth, 128) + alignSize(sizeof(short) * outHeight, 128);
-    if (0 == (tmp = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, tmpLen))) {
         printf("---Error: alloc dspSrcBuf failed\n");
         return -1;
     }
@@ -169,7 +154,7 @@ int main(int argc, char **argv)
     {
         ccosttime a("pre_process_nv12_hvx");
         for (int i = 0; i < 10; ++i) {
-            n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf1, dstLen, outWidth, outHeight, 0, tmp, tmpLen);
+            n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf1, dstLen, outWidth, outHeight, 0);
             RGBA2BGR(dspDstBuf1, outWidth, outHeight, outStride, dspDstBuf);
         }
     }
@@ -201,10 +186,8 @@ FAIL:
         rpcmem_free(dspSrcBuf);
     if (dspDstBuf)
         rpcmem_free(dspDstBuf);
-    if(testVec)
-        rpcmem_free(testVec);
-    if(tmp)
-        rpcmem_free(tmp);
+    if (dspDstBuf1)
+        rpcmem_free(dspDstBuf1);
 
     rpcmem_deinit();
     return 0;

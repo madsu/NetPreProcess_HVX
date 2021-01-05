@@ -6,8 +6,7 @@ interface pre_process {
    long nv12_ori(in sequence<uint8> pSrc, in long srcWidth, in long srcHeight, 
                  inrout sequence<uint8> pDst, in long dstWidth, in long dstHeight, in long rotate);
    long nv12_hvx(in sequence<uint8> pSrc, in long srcWidth, in long srcHeight, 
-                 inrout sequence<uint8> pDst, in long dstWidth, in long dstHeight, in long rotate,
-                 inrout sequence<uint8> tmp);
+                 inrout sequence<uint8> pDst, in long dstWidth, in long dstHeight, in long rotate);
 };
 
 #endif
