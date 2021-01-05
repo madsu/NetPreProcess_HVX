@@ -170,6 +170,7 @@ int main(int argc, char **argv)
         ccosttime a("pre_process_nv12_hvx");
         for (int i = 0; i < 10; ++i) {
             n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf1, dstLen, outWidth, outHeight, 0, tmp, tmpLen);
+            RGBA2BGR(dspDstBuf1, outWidth, outHeight, outStride, dspDstBuf);
         }
     }
 
