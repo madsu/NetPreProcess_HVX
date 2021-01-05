@@ -224,6 +224,7 @@ typedef struct
     uint16_t *fvAry;
 } nv12hvx_callback_t;
 
+#define   roundup_t(a, m)   (((a)+(m)-1)&(-m))
 static void pre_process_nv12_callback(void *data)
 {
     nv12hvx_callback_t *dptr = (nv12hvx_callback_t *)data;
@@ -250,10 +251,15 @@ static void pre_process_nv12_callback(void *data)
     uint8_t *pSrcY = (uint8_t *)(pSrcImg + tid * srcRows * srcWidth);
     unsigned char *pSrcU = (unsigned char *)(pSrcImg + srcHeight * srcWidth + tid * srcRows * srcWidth / 2);
     unsigned char *pSrcV = pSrcU + 1;
-    int lineBytes = alignSize(dstWidth, VECLEN) * 4;
-    uint8_t *pDst = pDstImg + tid * dstRows * lineBytes;
+    int dstPadWidth = alignSize(dstWidth, VECLEN);
+    int dstStride = dstPadWidth * 4;
+    uint8_t *pDst = pDstImg + tid * dstRows * dstStride;
+
+    //compute cycle num
     int32_t nn = dstRows >> 1;
     int32_t remain = dstRows & 1;
+    int32_t l2fsize = roundup_t(srcWidth * 2, VECLEN) * sizeof(uint8_t);
+    uint64_t L2FETCH_PARA = CreateL2pfParam(srcWidth * 2 * sizeof(uint8_t), l2fsize, 1, 0);
 
     //alloc buf
     uint8_t *buf = (uint8_t *)memalign(VECLEN, sizeof(uint8_t) * VECLEN * 12);
@@ -297,30 +303,30 @@ static void pre_process_nv12_callback(void *data)
 
     int32_t dy = 0;
     for (; nn > 0; nn--, dy += 2) {
-        int sy0 = syAry[dy];
-        int sy0_ = MIN(sy0 + 1, srcHeight - 1);
-        int sy1 = syAry[dy + 1];
-        int sy1_ = MIN(sy1 + 1, srcHeight - 1);
-        int su0 = sy0 >> 1;
-        int su0_ = sy0_ >> 1;
+        int32_t sy0 = syAry[dy];
+        int32_t sy0_ = MIN(sy0 + 1, srcHeight - 1);
+        int32_t sy1 = syAry[dy + 1];
+        int32_t sy1_ = MIN(sy1 + 1, srcHeight - 1);
+        int32_t su0 = sy0 >> 1;
+        int32_t su0_ = sy0_ >> 1;
 
         HVX_Vector vV0uh0 = Q6_Vh_vsplat_R(fvAry[dy]);
         HVX_Vector vV1uh0 = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh0);
         HVX_Vector vV0uh1 = Q6_Vh_vsplat_R(fvAry[dy + 1]);
         HVX_Vector vV1uh1 = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh1);
 
-        HVX_Vector *prgb0 = (HVX_Vector *)(pDst + dy * lineBytes);
-        HVX_Vector *prgb1 = (HVX_Vector *)(pDst + (dy + 1) * lineBytes);
+        HVX_Vector *prgb0 = (HVX_Vector *)(pDst + dy * dstStride);
+        HVX_Vector *prgb1 = (HVX_Vector *)(pDst + (dy + 1) * dstStride);
+        L2fetch(pSrcY + sy0 * srcWidth, L2FETCH_PARA);
+        L2fetch(pSrcY + sy1 * srcWidth, L2FETCH_PARA);
+        L2fetch(pSrcU + su0 * srcWidth, L2FETCH_PARA);
 
-        int ii = alignSize(dstWidth, VECLEN) / VECLEN;
-        for (int i = 0; i < ii; i++) {
-            int startX = i * VECLEN;
-            int *startXAry = sxAry + startX;
-
+        for (int32_t idx = 0; idx < dstPadWidth; idx += VECLEN) {
             //load YUV to buf;
-            for (int dx = 0; dx < VECLEN; ++dx) {
-                int sx = startXAry[dx];
-                int sx_ = MIN(sx + 1, srcWidth - 1);
+            int32_t *startXAry = sxAry + idx;
+            for (int32_t dx = 0; dx < VECLEN; ++dx) {
+                int32_t sx = startXAry[dx];
+                int32_t sx_ = MIN(sx + 1, srcWidth - 1);
                 pX0Y0y0[dx] = pSrcY[sy0 * srcWidth + sx];
                 pX1Y0y0[dx] = pSrcY[sy0 * srcWidth + sx_];
                 pX0Y1y0[dx] = pSrcY[sy0_ * srcWidth + sx];
@@ -346,7 +352,7 @@ static void pre_process_nv12_callback(void *data)
             }
 
             //Load fu
-            HVX_VectorPair *pU0 = (HVX_VectorPair *)(fuAry + startX);
+            HVX_VectorPair *pU0 = (HVX_VectorPair *)(fuAry + idx);
             HVX_Vector vU0uhH = Q6_V_hi_W(pU0[0]);
             HVX_Vector vU0uhL = Q6_V_lo_W(pU0[0]);
             HVX_Vector vU1uhH = Q6_Vuh_vsub_VuhVuh_sat(vVScaleh, vU0uhH);
@@ -504,26 +510,26 @@ static void pre_process_nv12_callback(void *data)
     }
 
     for (; remain > 0; remain--, dy++) {
-        int sy0 = syAry[dy];
-        int sy0_ = MIN(sy0 + 1, srcHeight - 1);
-        int su0 = sy0 >> 1;
-        int su0_ = sy0_ >> 1;
+        int32_t sy0 = syAry[dy];
+        int32_t sy0_ = MIN(sy0 + 1, srcHeight - 1);
+        int32_t su0 = sy0 >> 1;
+        int32_t su0_ = sy0_ >> 1;
 
         HVX_Vector vV0uh0 = Q6_Vh_vsplat_R(fvAry[dy]);
         HVX_Vector vV1uh0 = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh0);
         HVX_Vector vV0uh1 = Q6_Vh_vsplat_R(fvAry[dy + 1]);
         HVX_Vector vV1uh1 = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh1);
 
-        HVX_Vector *prgb0 = (HVX_Vector *)(pDst + dy * lineBytes);
-        int ii = alignSize(dstWidth, VECLEN) / VECLEN;
-        for (int i = 0; i < ii; i++) {
-            int startX = i * VECLEN;
-            int *startXAry = sxAry + startX;
+        HVX_Vector *prgb0 = (HVX_Vector *)(pDst + dy * dstStride);
+        L2fetch(pSrcY + sy0 * srcWidth, L2FETCH_PARA);
+        L2fetch(pSrcU + su0 * srcWidth, L2FETCH_PARA);
 
+        for (int32_t idx = 0; idx < dstPadWidth; idx += VECLEN) {
             //load YUV to buf;
-            for (int dx = 0; dx < VECLEN; ++dx) {
-                int sx = startXAry[dx];
-                int sx_ = MIN(sx + 1, srcWidth - 1);
+            int32_t *startXAry = sxAry + idx;
+            for (int32_t dx = 0; dx < VECLEN; ++dx) {
+                int32_t sx = startXAry[dx];
+                int32_t sx_ = MIN(sx + 1, srcWidth - 1);
                 pX0Y0y0[dx] = pSrcY[sy0 * srcWidth + sx];
                 pX1Y0y0[dx] = pSrcY[sy0 * srcWidth + sx_];
                 pX0Y1y0[dx] = pSrcY[sy0_ * srcWidth + sx];
@@ -545,7 +551,7 @@ static void pre_process_nv12_callback(void *data)
             }
 
             //Load fu
-            HVX_VectorPair *pU0 = (HVX_VectorPair *)(fuAry + startX);
+            HVX_VectorPair *pU0 = (HVX_VectorPair *)(fuAry + idx);
             HVX_Vector vU0uhH = Q6_V_hi_W(pU0[0]);
             HVX_Vector vU0uhL = Q6_V_lo_W(pU0[0]);
             HVX_Vector vU1uhH = Q6_Vuh_vsub_VuhVuh_sat(vVScaleh, vU0uhH);
