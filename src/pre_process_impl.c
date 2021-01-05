@@ -955,7 +955,10 @@ static void pre_process_nv12_callback(void *data)
         *prgb0++ = Q6_V_hi_W(dIffBGR);
     }
 
-    free(buf);
+    if (buf != NULL) {
+        free(buf);
+        buf = NULL;
+    }
     dspCV_worker_pool_synctoken_jobdone(dptr->token);
 }
 
