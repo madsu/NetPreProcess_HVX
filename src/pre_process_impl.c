@@ -7,6 +7,8 @@
 
 #include "HAP_farf.h"
 #include "HAP_power.h"
+#include "HAP_compute_res.h"
+#include "HAP_vtcm_mgr.h"
 
 #include "q6cache.h"
 #include "dspCV_hvx.h"
@@ -290,6 +292,11 @@ static void pre_process_nv12_callback(void *data)
     HVX_Vector sConst16 = Q6_V_vsplat_R(0x10101010);
     HVX_Vector vVScaleh = Q6_Vh_vsplat_R(scale);
 
+    uint64_t readTime = 0;
+    uint64_t computeTime = 0;
+    uint64_t startTime = 0;
+    uint64_t stopTime = 0;
+
     for (int dy = 0; dy < dstSlice; dy += 2) {
         int sy0 = syAry[dy];
         int sy0_ = MIN(sy0 + 1, srcHeight - 1);
@@ -312,6 +319,7 @@ static void pre_process_nv12_callback(void *data)
             int *startXAry = sxAry + startX;
 
             //load YUV to buf;
+            startTime = HAP_perf_get_time_us();
             for (int dx = 0; dx < VECLEN; ++dx) {
                 int sx = startXAry[dx];
                 int sx_ = MIN(sx + 1, srcWidth - 1);
@@ -339,7 +347,10 @@ static void pre_process_nv12_callback(void *data)
                     pX1Y1u[dx] = pSrcV[su0_ * srcWidth + sx_];
                 }
             }
+            stopTime = HAP_perf_get_time_us();
+            readTime += stopTime - startTime;
 
+            startTime = HAP_perf_get_time_us();
             //Load fu
             HVX_VectorPair *pU0 = (HVX_VectorPair *)(fuAry + startX);
             HVX_Vector vU0uhH = Q6_V_hi_W(pU0[0]);
@@ -495,8 +506,12 @@ static void pre_process_nv12_callback(void *data)
             dIffBGR = Q6_W_vshuff_VVR(sIffG, sIBR, const_1);
             *prgb1++ = Q6_V_lo_W(dIffBGR);
             *prgb1++ = Q6_V_hi_W(dIffBGR);
+            stopTime = HAP_perf_get_time_us();
+            computeTime += stopTime - startTime;
         }
     }
+
+    printf("readTime = %lld, computeTime = %lld\n", readTime, computeTime);
 
     free(buf);
 
@@ -507,6 +522,28 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
                          uint8 *pDst, int pDstLen, int dstWidth, int dstHeight, int rotate,
                          uint8 *tmp, int tmpLen)
 {
+    uint64_t startTime = HAP_perf_get_time_us();
+
+    //get vctm
+    compute_res_attr_t res_info;
+    unsigned int context_id = 0;
+    unsigned char *vtcm = NULL;
+
+    int res = HAP_compute_res_attr_init(&res_info);
+    if (res != HAP_COMPUTE_RES_NOT_SUPPORTED) {
+        HAP_compute_res_attr_set_serialize(&res_info, 1);
+        HAP_compute_res_attr_set_vtcm_param(&res_info, 64 * 1024, 0);
+        context_id = HAP_compute_res_acquire(&res_info, 100000);
+        if (context_id == 0) {
+            return -1;
+        }
+
+        vtcm = HAP_compute_res_attr_get_vtcm_ptr(&res_info);
+    } else {
+        vtcm = HAP_request_VTCM(64 * 1024, 1);
+    }
+    printf("context_id = %d, vtcm=%p\n", context_id, vtcm);
+
     (void)dspCV_hvx_power_on();
 
     (void)dspCV_worker_pool_init();
@@ -516,13 +553,10 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     float xratio = 0;
     float yratio = 0;
 
-    if (rotate == 0 || rotate == 180)
-    {
+    if (rotate == 0 || rotate == 180) {
         xratio = (float)srcWidth / dstWidth;
         yratio = (float)srcHeight / dstHeight;
-    }
-    else
-    {
+    } else {
         xratio = (float)srcWidth / dstHeight;
         yratio = (float)srcHeight / dstWidth;
     }
@@ -541,19 +575,16 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     uint16_t *fvAry = (uint16_t *)tmp; //memalign(VLEN, dstHeight * sizeof(uint16_t));
     tmp += alignSize(dstHeight * sizeof(uint16_t), VECLEN);
 
-    for (int dx = 0; dx < dstWidth; ++dx)
-    {
+
+    for (int dx = 0; dx < dstWidth; ++dx) {
         float fx = (float)((dx + 0.5) * xratio - 0.5);
 
         int x = (int)floor(fx);
         float u = fx - x;
-        if (x < 0)
-        {
+        if (x < 0) {
             x = 0;
             u = 0.f;
-        }
-        else if (x >= srcWidth)
-        {
+        } else if (x >= srcWidth) {
             x = srcWidth - 1;
             u = 0.f;
         }
@@ -562,19 +593,15 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
         fuAry[dx] = (uint16_t)(u * scale);
     }
 
-    for (int dy = 0; dy < dstHeight; ++dy)
-    {
+    for (int dy = 0; dy < dstHeight; ++dy) {
         float fy = (float)((dy + 0.5f) * yratio - 0.5f);
 
         int y = (int)floor(fy);
         float v = fy - y;
-        if (y < 0)
-        {
+        if (y < 0) {
             y = 0;
             v = 0.f;
-        }
-        else if (y >= srcHeight)
-        {
+        } else if (y >= srcHeight) {
             y = srcHeight - 1;
             v = 0.f;
         }
@@ -602,19 +629,28 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     dptr.fvAry = fvAry;
     dptr.threadIdx = 0;
 
-    int numWorkers = 2;
+    int numWorkers = 1;
     dptr.threadCount = numWorkers;
     job.dptr = (void *)&dptr;
     job.fptr = pre_process_nv12_callback;
     dspCV_worker_pool_synctoken_init(&token, numWorkers);
 
-    for (int i = 0; i < numWorkers; ++i)
-    {
+    for (int i = 0; i < numWorkers; ++i) {
         dspCV_worker_pool_submit(job);
     }
 
     dspCV_worker_pool_synctoken_wait(&token);
     dspCV_worker_pool_deinit();
+
+    if (res != HAP_COMPUTE_RES_NOT_SUPPORTED) {
+        HAP_compute_res_release(context_id);
+    } else if (vtcm != NULL) {
+        HAP_release_VTCM(vtcm);
+        vtcm = NULL;
+    }
+
+    uint64_t stopTime = HAP_perf_get_time_us();
+    printf("elpase time = %lld\n", stopTime - startTime);
 
     return 0;
 }
