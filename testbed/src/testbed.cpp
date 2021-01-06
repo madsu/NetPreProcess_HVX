@@ -58,8 +58,9 @@ int main(int argc, char **argv)
     int width = 1920;
     int height = 1080;
 
-    int outWidth = 481;
-    int outHeight = 289;
+    int outWidth = 289;
+    int outHeight = 481;
+    int rotate = 270;
 
     unsigned char *image;
     LoadYUV(argv[1], width, height, &image);
@@ -68,7 +69,7 @@ int main(int argc, char **argv)
     int dstLen = sizeof(unsigned char) * outWidth * outHeight * 3;
     unsigned char *dstImage = (unsigned char *)malloc(dstLen);
 
-    nv12_pre_process(image, width, height, dstImage, outWidth, outHeight, 0);
+    nv12_pre_process(image, width, height, dstImage, outWidth, outHeight, rotate);
 
     cv::Mat cpu_img(outHeight, outWidth, CV_8UC3, dstImage);
     cv::imwrite("/data/local/tmp/HVX_test/cpu_outimg.bmp", cpu_img);
@@ -130,7 +131,7 @@ int main(int argc, char **argv)
     {
         ccosttime a("pre_process_nv12_ori");
         for (int i = 0; i < 10; ++i) {
-            n = pre_process_nv12_ori(dspSrcBuf, srcLen, width, height, dspDstBuf, dstLen, outWidth, outHeight, 0);
+            n = pre_process_nv12_ori(dspSrcBuf, srcLen, width, height, dspDstBuf, dstLen, outWidth, outHeight, rotate);
         }
     }
 
@@ -154,14 +155,7 @@ int main(int argc, char **argv)
     {
         ccosttime a("pre_process_nv12_hvx");
         for (int i = 0; i < 10; ++i) {
-            n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf1, dstLen, outWidth, outHeight, 0);
-            RGBA2BGR(dspDstBuf1, outWidth, outHeight, outStride, dspDstBuf);
-        }
-    }
-
-    {
-        ccosttime a("rgba2bgr");
-        for (int i = 0; i < 10; ++i) {
+            n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf1, dstLen, outWidth, outHeight, rotate);
             RGBA2BGR(dspDstBuf1, outWidth, outHeight, outStride, dspDstBuf);
         }
     }
