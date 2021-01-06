@@ -212,6 +212,7 @@ typedef struct
     uint8_t *pDstImg;
     int32_t dstWidth;
     int32_t dstHeight;
+    int32_t rotate;
 
     int *sxAry;
     int *syAry;
@@ -232,23 +233,25 @@ static void pre_process_nv12_callback(void *data)
     uint8_t *pDstImg = dptr->pDstImg;
     int32_t dstWidth = dptr->dstWidth;
     int32_t dstHeight = dptr->dstHeight;
-    int *sxAry = dptr->sxAry;
-    int *syAry = dptr->syAry;
+    int32_t *sxAry = dptr->sxAry;
+    int32_t *syAry = dptr->syAry;
     uint16_t *fuAry = dptr->fuAry;
     uint16_t *fvAry = dptr->fvAry;
+    int32_t rotate = dptr->rotate;
+
+    const uint8_t *pSrcY = pSrcImg;
+    const uint8_t *pSrcU = pSrcY + srcHeight * srcWidth;
+    const uint8_t *pSrcV = pSrcU + 1;
+    uint8_t *pDst = pDstImg;
+    int32_t dstStride = roundup_t(dstWidth, VECLEN) * 4;
 
     //compute dst rows for every thread
     int32_t srcRows = srcHeight / NUM_THREADS;
     int32_t dstRows = dstHeight / NUM_THREADS;
+    int32_t startY = tid * dstRows;
     if (tid == (NUM_THREADS - 1)) {
         dstRows = dstHeight - dstRows * (NUM_THREADS - 1);
     }
-    uint8_t *pSrcY = (uint8_t *)(pSrcImg + tid * srcRows * srcWidth);
-    unsigned char *pSrcU = (unsigned char *)(pSrcImg + srcHeight * srcWidth + tid * srcRows * srcWidth / 2);
-    unsigned char *pSrcV = pSrcU + 1;
-    int dstPadWidth = roundup_t(dstWidth, VECLEN);
-    int dstStride = dstPadWidth * 4;
-    uint8_t *pDst = pDstImg + tid * dstRows * dstStride;
 
     //compute cycle num
     int32_t nn = dstRows >> 1;
@@ -296,7 +299,7 @@ static void pre_process_nv12_callback(void *data)
     HVX_Vector sConst16 = Q6_V_vsplat_R(0x10101010);
     HVX_Vector vVScaleh = Q6_Vh_vsplat_R(scale);
 
-    int32_t dy = 0;
+    int32_t dy = startY;
     for (; nn > 0; nn--, dy += 2) {
         int32_t sy0 = syAry[dy];
         int32_t sy0_ = MIN(sy0 + 1, srcHeight - 1);
@@ -697,8 +700,6 @@ static void pre_process_nv12_callback(void *data)
 
         HVX_Vector vV0uh0 = Q6_Vh_vsplat_R(fvAry[dy]);
         HVX_Vector vV1uh0 = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh0);
-        HVX_Vector vV0uh1 = Q6_Vh_vsplat_R(fvAry[dy + 1]);
-        HVX_Vector vV1uh1 = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh1);
 
         HVX_Vector *prgb0 = (HVX_Vector *)(pDst + dy * dstStride);
         L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
@@ -1056,6 +1057,7 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     dptr.pDstImg = pDst;
     dptr.dstWidth = dstWidth;
     dptr.dstHeight = dstHeight;
+    dptr.rotate = rotate;
 
     dptr.sxAry = sxAry;
     dptr.syAry = syAry;
