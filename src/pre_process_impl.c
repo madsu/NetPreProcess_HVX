@@ -323,6 +323,19 @@ static void pre_process_nv12_callback(void *data)
             L2fetch((unsigned int)(pSrcY + sy1 * srcWidth), L2FETCH_PARA);
             L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
         } else if (rotate == 90) {
+            sx = MIN(srcWidth - syAry[dy], srcWidth - 1);
+            sx_ = MAX(sx - 1, 0);
+        } else if(rotate == 180) {
+            sy0 = MIN(srcHeight - syAry[dy], srcHeight - 1);
+            sy0_ = MAX(sy0 - 1, 0);
+            sy1 = MIN(srcHeight - syAry[dy + 1], srcHeight - 1);
+            sy1_ = MAX(sy1 - 1, 0);
+            su0 = sy0 >> 1;
+            su0_ = sy0_ >> 1;
+            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
+            L2fetch((unsigned int)(pSrcY + sy1 * srcWidth), L2FETCH_PARA);
+            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
+        } else {
             sx = syAry[dy];
             sx_ = MIN(sx + 1, srcWidth - 1);
         }
@@ -335,9 +348,21 @@ static void pre_process_nv12_callback(void *data)
                     sx = sxAry[dx + idx];
                     sx_ = MIN(sx + 1, srcWidth - 1);
                 } else if(rotate == 90) {
+                    sy0 = sxAry[dx + idx];
+                    sy0_ = MIN(sy0 + 1, srcHeight - 1);
+                    int32_t iy1 = MIN(dx + 1 + idx, dstWidth - 1);
+                    sy1 = sxAry[iy1];
+                    sy1_ = MIN(sy1 + 1, srcHeight - 1);
+                    su0 = sy0 >> 1;
+                    su0_ = sy0_ >> 1;
+                } else if(rotate == 180) {
+                    sx = MIN(srcWidth - sxAry[dx + idx], srcWidth - 1);
+                    sx_ = MAX(sx - 1, 0);
+                } else {
                     sy0 = MIN(srcHeight - sxAry[dx + idx], srcHeight - 1);
                     sy0_ = MAX(sy0 - 1, 0);
-                    sy1 = MIN(srcHeight - sxAry[dx + 1 + idx], srcHeight - 1);
+                    int32_t iy1 = MIN(dx + 1 + idx, dstWidth - 1);
+                    sy1 = MIN(srcHeight - sxAry[iy1], srcHeight - 1);
                     sy1_ = MAX(sy1 - 1, 0);
                     su0 = sy0 >> 1;
                     su0_ = sy0_ >> 1;
@@ -352,18 +377,18 @@ static void pre_process_nv12_callback(void *data)
                 pX0Y1y1[idx] = pSrcY[sy1_ * srcWidth + sx];
                 pX1Y1y1[idx] = pSrcY[sy1_ * srcWidth + sx_];
 
-                sx -= sx % 2;
-                sx_ -= sx_ % 2;
+                int32_t sux = sx - sx % 2;
+                int32_t sux_ = sx_ - sx_ % 2;
                 if (idx % 2 == 0) {
-                    pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sx];
-                    pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sx_];
-                    pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sx];
-                    pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sx_];
+                    pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sux];
+                    pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sux_];
+                    pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sux];
+                    pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sux_];
                 } else {
-                    pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sx];
-                    pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sx_];
-                    pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sx];
-                    pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sx_];
+                    pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sux];
+                    pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sux_];
+                    pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sux];
+                    pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sux_];
                 }
             }
 
@@ -529,9 +554,21 @@ static void pre_process_nv12_callback(void *data)
                 sx = sxAry[dx + idx];
                 sx_ = MIN(sx + 1, srcWidth - 1);
             } else if (rotate == 90) {
+                sy0 = sxAry[dx + idx];
+                sy0_ = MIN(sy0 + 1, srcHeight - 1);
+                int32_t iy1 = MIN(dx + 1 + idx, dstWidth - 1);
+                sy1 = sxAry[iy1];
+                sy1_ = MIN(sy1 + 1, srcHeight - 1);
+                su0 = sy0 >> 1;
+                su0_ = sy0_ >> 1;
+            } else if (rotate == 180) {
+                sx = MIN(srcWidth - sxAry[dx + idx], srcWidth - 1);
+                sx_ = MAX(sx - 1, 0);
+            } else {
                 sy0 = MIN(srcHeight - sxAry[dx + idx], srcHeight - 1);
                 sy0_ = MAX(sy0 - 1, 0);
-                sy1 = MIN(srcHeight - sxAry[dx + 1 + idx], srcHeight - 1);
+                int32_t iy1 = MIN(dx + 1 + idx, dstWidth - 1);
+                sy1 = MIN(srcHeight - sxAry[iy1], srcHeight - 1);
                 sy1_ = MAX(sy1 - 1, 0);
                 su0 = sy0 >> 1;
                 su0_ = sy0_ >> 1;
@@ -546,18 +583,18 @@ static void pre_process_nv12_callback(void *data)
             pX0Y1y1[idx] = pSrcY[sy1_ * srcWidth + sx];
             pX1Y1y1[idx] = pSrcY[sy1_ * srcWidth + sx_];
 
-            sx -= sx % 2;
-            sx_ -= sx_ % 2;
+            int32_t sux = sx - sx % 2;
+            int32_t sux_ = sx_ - sx_ % 2;
             if (idx % 2 == 0) {
-                pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sx];
-                pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sx_];
-                pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sx];
-                pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sx_];
+                pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sux];
+                pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sux_];
+                pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sux];
+                pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sux_];
             } else {
-                pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sx];
-                pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sx_];
-                pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sx];
-                pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sx_];
+                pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sux];
+                pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sux_];
+                pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sux];
+                pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sux_];
             }
         }
 
@@ -733,6 +770,16 @@ static void pre_process_nv12_callback(void *data)
             L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
             L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
         } else if (rotate == 90) {
+            sx = MIN(srcWidth - syAry[dy], srcWidth - 1);
+            sx_ = MAX(sx - 1, 0);
+        } else if(rotate == 180) {
+            sy0 = MIN(srcHeight - syAry[dy], srcHeight - 1);
+            sy0_ = MAX(sy0 - 1, 0);
+            su0 = sy0 >> 1;
+            su0_ = sy0_ >> 1;
+            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
+            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
+        } else {
             sx = syAry[dy];
             sx_ = MIN(sx + 1, srcWidth - 1);
         }
@@ -745,6 +792,14 @@ static void pre_process_nv12_callback(void *data)
                     sx = sxAry[dx + idx];
                     sx_ = MIN(sx + 1, srcWidth - 1);
                 } else if (rotate == 90) {
+                    sy0 = sxAry[dx + idx];
+                    sy0_ = MIN(sy0 + 1, srcHeight - 1);
+                    su0 = sy0 >> 1;
+                    su0_ = sy0_ >> 1;
+                } else if (rotate == 180) {
+                    sx = MIN(srcWidth - sxAry[dx + idx], srcWidth - 1);
+                    sx_ = MAX(sx - 1, 0);
+                } else {
                     sy0 = MIN(srcHeight - sxAry[dx + idx], srcHeight - 1);
                     sy0_ = MAX(sy0 - 1, 0);
                     su0 = sy0 >> 1;
@@ -756,18 +811,18 @@ static void pre_process_nv12_callback(void *data)
                 pX0Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx];
                 pX1Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx_];
 
-                sx -= sx % 2;
-                sx_ -= sx_ % 2;
-                if (dx % 2 == 0) {
-                    pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sx];
-                    pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sx_];
-                    pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sx];
-                    pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sx_];
+                int32_t sux = sx - sx % 2;
+                int32_t sux_ = sx_ - sx_ % 2;
+                if (idx % 2 == 0) {
+                    pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sux];
+                    pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sux_];
+                    pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sux];
+                    pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sux_];
                 } else {
-                    pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sx];
-                    pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sx_];
-                    pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sx];
-                    pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sx_];
+                    pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sux];
+                    pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sux_];
+                    pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sux];
+                    pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sux_];
                 }
             }
 
@@ -874,6 +929,14 @@ static void pre_process_nv12_callback(void *data)
                 sx = sxAry[dx + idx];
                 sx_ = MIN(sx + 1, srcWidth - 1);
             } else if (rotate == 90) {
+                sy0 = sxAry[dx + idx];
+                sy0_ = MIN(sy0 + 1, srcHeight - 1);
+                su0 = sy0 >> 1;
+                su0_ = sy0_ >> 1;
+            } else if (rotate == 180) {
+                sx = MIN(srcWidth - sxAry[dx + idx], srcWidth - 1);
+                sx_ = MAX(sx - 1, 0);
+            } else {
                 sy0 = MIN(srcHeight - sxAry[dx + idx], srcHeight - 1);
                 sy0_ = MAX(sy0 - 1, 0);
                 su0 = sy0 >> 1;
@@ -885,18 +948,18 @@ static void pre_process_nv12_callback(void *data)
             pX0Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx];
             pX1Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx_];
 
-            sx -= sx % 2;
-            sx_ -= sx_ % 2;
-            if (dx % 2 == 0) {
-                pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sx];
-                pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sx_];
-                pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sx];
-                pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sx_];
+            int32_t sux = sx - sx % 2;
+            int32_t sux_ = sx_ - sx_ % 2;
+            if (idx % 2 == 0) {
+                pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sux];
+                pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sux_];
+                pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sux];
+                pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sux_];
             } else {
-                pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sx];
-                pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sx_];
-                pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sx];
-                pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sx_];
+                pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sux];
+                pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sux_];
+                pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sux];
+                pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sux_];
             }
         }
 
