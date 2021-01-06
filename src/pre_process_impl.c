@@ -214,8 +214,8 @@ typedef struct
     int32_t dstHeight;
     int32_t rotate;
 
-    int *sxAry;
-    int *syAry;
+    int32_t *sxAry;
+    int32_t *syAry;
     uint16_t *fuAry;
     uint16_t *fvAry;
 } nv12hvx_callback_t;
@@ -254,8 +254,10 @@ static void pre_process_nv12_callback(void *data)
     }
 
     //compute cycle num
-    int32_t nn = dstRows >> 1;
-    int32_t remain = dstRows & 1;
+    int32_t nnY = dstRows >> 1;
+    int32_t remainY = dstRows & 1;
+    int32_t nnX = dstWidth / VECLEN;
+    int32_t remainX = dstWidth - (nnX * VECLEN);
     int32_t l2fsize = roundup_t(srcWidth * 2, VECLEN) * sizeof(uint8_t);
     uint64_t L2FETCH_PARA = CreateL2pfParam(srcWidth * 2 * sizeof(uint8_t), l2fsize, 1, 0);
 
@@ -300,14 +302,7 @@ static void pre_process_nv12_callback(void *data)
     HVX_Vector vVScaleh = Q6_Vh_vsplat_R(scale);
 
     int32_t dy = startY;
-    for (; nn > 0; nn--, dy += 2) {
-        int32_t sy0 = syAry[dy];
-        int32_t sy0_ = MIN(sy0 + 1, srcHeight - 1);
-        int32_t sy1 = syAry[dy + 1];
-        int32_t sy1_ = MIN(sy1 + 1, srcHeight - 1);
-        int32_t su0 = sy0 >> 1;
-        int32_t su0_ = sy0_ >> 1;
-
+    for (; nnY > 0; nnY--, dy += 2) {
         HVX_Vector vV0uh0 = Q6_Vh_vsplat_R(fvAry[dy]);
         HVX_Vector vV1uh0 = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh0);
         HVX_Vector vV0uh1 = Q6_Vh_vsplat_R(fvAry[dy + 1]);
@@ -315,18 +310,39 @@ static void pre_process_nv12_callback(void *data)
 
         HVX_Vector *prgb0 = (HVX_Vector *)(pDst + dy * dstStride);
         HVX_Vector *prgb1 = (HVX_Vector *)(pDst + (dy + 1) * dstStride);
-        L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
-        L2fetch((unsigned int)(pSrcY + sy1 * srcWidth), L2FETCH_PARA);
-        L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
+
+        int32_t sx, sx_, sy0, sy0_, sy1, sy1_, su0, su0_;
+        if (rotate == 0) {
+            sy0 = syAry[dy];
+            sy0_ = MIN(sy0 + 1, srcHeight - 1);
+            sy1 = syAry[dy + 1];
+            sy1_ = MIN(sy1 + 1, srcHeight - 1);
+            su0 = sy0 >> 1;
+            su0_ = sy0_ >> 1;
+            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
+            L2fetch((unsigned int)(pSrcY + sy1 * srcWidth), L2FETCH_PARA);
+            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
+        } else if (rotate == 90) {
+            sx = syAry[dy];
+            sx_ = MIN(sx + 1, srcWidth - 1);
+        }
 
         int32_t dx = 0;
-        int32_t nnX = dstWidth / VECLEN;
-        int32_t remainX = dstWidth - (nnX * VECLEN);
-        for (; nnX > 0; nnX--, dx += VECLEN) {
+        for (int32_t n = 0; n < nnX; n++, dx += VECLEN) {
             //load YUV to buf;
             for (int32_t idx = 0; idx < VECLEN; ++idx) {
-                int32_t sx = sxAry[dx + idx];
-                int32_t sx_ = MIN(sx + 1, srcWidth - 1);
+                if (rotate == 0) {
+                    sx = sxAry[dx + idx];
+                    sx_ = MIN(sx + 1, srcWidth - 1);
+                } else if(rotate == 90) {
+                    sy0 = MIN(srcHeight - sxAry[dx + idx], srcHeight - 1);
+                    sy0_ = MAX(sy0 - 1, 0);
+                    sy1 = MIN(srcHeight - sxAry[dx + 1 + idx], srcHeight - 1);
+                    sy1_ = MAX(sy1 - 1, 0);
+                    su0 = sy0 >> 1;
+                    su0_ = sy0_ >> 1;
+                }
+
                 pX0Y0y0[idx] = pSrcY[sy0 * srcWidth + sx];
                 pX1Y0y0[idx] = pSrcY[sy0 * srcWidth + sx_];
                 pX0Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx];
@@ -509,8 +525,18 @@ static void pre_process_nv12_callback(void *data)
         }
 
         for (int32_t idx = 0; idx < remainX; ++idx) {
-            int32_t sx = sxAry[dx + idx];
-            int32_t sx_ = MIN(sx + 1, srcWidth - 1);
+            if (rotate == 0) {
+                sx = sxAry[dx + idx];
+                sx_ = MIN(sx + 1, srcWidth - 1);
+            } else if (rotate == 90) {
+                sy0 = MIN(srcHeight - sxAry[dx + idx], srcHeight - 1);
+                sy0_ = MAX(sy0 - 1, 0);
+                sy1 = MIN(srcHeight - sxAry[dx + 1 + idx], srcHeight - 1);
+                sy1_ = MAX(sy1 - 1, 0);
+                su0 = sy0 >> 1;
+                su0_ = sy0_ >> 1;
+            }
+
             pX0Y0y0[idx] = pSrcY[sy0 * srcWidth + sx];
             pX1Y0y0[idx] = pSrcY[sy0 * srcWidth + sx_];
             pX0Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx];
@@ -692,27 +718,39 @@ static void pre_process_nv12_callback(void *data)
         *prgb1++ = Q6_V_hi_W(dIffBGR);
     }
 
-    for (; remain > 0; remain--, dy++) {
-        int32_t sy0 = syAry[dy];
-        int32_t sy0_ = MIN(sy0 + 1, srcHeight - 1);
-        int32_t su0 = sy0 >> 1;
-        int32_t su0_ = sy0_ >> 1;
-
+    for (; remainY > 0; remainY--, dy++) {
         HVX_Vector vV0uh0 = Q6_Vh_vsplat_R(fvAry[dy]);
         HVX_Vector vV1uh0 = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh0);
 
         HVX_Vector *prgb0 = (HVX_Vector *)(pDst + dy * dstStride);
-        L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
-        L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
+
+        int32_t sx, sx_, sy0, sy0_, su0, su0_;
+        if (rotate == 0) {
+            sy0 = syAry[dy];
+            sy0_ = MIN(sy0 + 1, srcHeight - 1);
+            su0 = sy0 >> 1;
+            su0_ = sy0_ >> 1;
+            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
+            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
+        } else if (rotate == 90) {
+            sx = syAry[dy];
+            sx_ = MIN(sx + 1, srcWidth - 1);
+        }
 
         int32_t dx = 0;
-        int32_t nnX = dstWidth / VECLEN;
-        int32_t remainX = dstWidth - (nnX * VECLEN);
-        for (; nnX > 0; nnX--, dx += VECLEN) {
+        for (int32_t n = 0; n < nnX; n++, dx += VECLEN) {
             //load YUV to buf;
             for (int32_t idx = 0; idx < VECLEN; ++idx) {
-                int32_t sx = sxAry[dx + idx];
-                int32_t sx_ = MIN(sx + 1, srcWidth - 1);
+                if (rotate == 0) {
+                    sx = sxAry[dx + idx];
+                    sx_ = MIN(sx + 1, srcWidth - 1);
+                } else if (rotate == 90) {
+                    sy0 = MIN(srcHeight - sxAry[dx + idx], srcHeight - 1);
+                    sy0_ = MAX(sy0 - 1, 0);
+                    su0 = sy0 >> 1;
+                    su0_ = sy0_ >> 1;
+                }
+
                 pX0Y0y0[idx] = pSrcY[sy0 * srcWidth + sx];
                 pX1Y0y0[idx] = pSrcY[sy0 * srcWidth + sx_];
                 pX0Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx];
@@ -832,8 +870,16 @@ static void pre_process_nv12_callback(void *data)
 
         //load YUV to buf;
         for (int32_t idx = 0; idx < remainX; ++idx) {
-            int32_t sx = sxAry[dx + idx];
-            int32_t sx_ = MIN(sx + 1, srcWidth - 1);
+            if (rotate == 0) {
+                sx = sxAry[dx + idx];
+                sx_ = MIN(sx + 1, srcWidth - 1);
+            } else if (rotate == 90) {
+                sy0 = MIN(srcHeight - sxAry[dx + idx], srcHeight - 1);
+                sy0_ = MAX(sy0 - 1, 0);
+                su0 = sy0 >> 1;
+                su0_ = sy0_ >> 1;
+            }
+
             pX0Y0y0[idx] = pSrcY[sy0 * srcWidth + sx];
             pX1Y0y0[idx] = pSrcY[sy0 * srcWidth + sx_];
             pX0Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx];
@@ -992,8 +1038,8 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
         xratio = (float)srcWidth / dstWidth;
         yratio = (float)srcHeight / dstHeight;
     } else {
-        xratio = (float)srcWidth / dstHeight;
-        yratio = (float)srcHeight / dstWidth;
+        xratio = (float)srcHeight / dstWidth;
+        yratio = (float)srcWidth / dstHeight;
     }
 
     //计算xy在原图上的坐标
