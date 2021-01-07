@@ -1128,8 +1128,13 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
         if (x < 0) {
             x = 0;
             u = 0.f;
-        } else if (x >= srcWidth) {
-            x = srcWidth - 1;
+        } else if (rotate == 0 || rotate == 180) {
+            if (x >= srcWidth) {
+                x = srcWidth - 1;
+                u = 0.f;
+            }
+        } else if (x >= srcHeight) {
+            x = srcHeight - 1;
             u = 0.f;
         }
 
@@ -1145,8 +1150,13 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
         if (y < 0) {
             y = 0;
             v = 0.f;
-        } else if (y >= srcHeight) {
-            y = srcHeight - 1;
+        } else if(rotate == 0 || rotate == 180) {
+            if (y >= srcHeight) {
+                y = srcHeight - 1;
+                v = 0.f;
+            }
+        } else if (y >= srcWidth) {
+            y = srcWidth - 1;
             v = 0.f;
         }
 
