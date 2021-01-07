@@ -1184,7 +1184,7 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     dptr.fvAry = fvAry;
     dptr.threadIdx = 0;
 
-    int numWorkers = 2;
+    int numWorkers = 4;
     dptr.threadCount = numWorkers;
     job.dptr = (void *)&dptr;
     job.fptr = pre_process_nv12_callback;
