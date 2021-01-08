@@ -258,8 +258,8 @@ static void pre_process_nv12_callback(void *data)
     int32_t remainY = dstRows & 1;
     int32_t nnX = dstWidth / VECLEN;
     int32_t remainX = dstWidth - (nnX * VECLEN);
-    int32_t l2fsize = roundup_t(srcWidth * 2, VECLEN) * sizeof(uint8_t);
-    uint64_t L2FETCH_PARA = CreateL2pfParam(srcWidth * 2 * sizeof(uint8_t), l2fsize, 1, 0);
+    uint64_t L2FETCH_PARA_H = CreateL2pfParam(srcWidth, srcWidth, 2, 0);
+    uint64_t L2FETCH_PARA_V = CreateL2pfParam(srcWidth, 2, srcHeight, 1);
 
     //alloc buf
     uint8_t *buf = (uint8_t *)memalign(VECLEN, sizeof(uint8_t) * VECLEN * 12);
@@ -319,12 +319,15 @@ static void pre_process_nv12_callback(void *data)
             sy1_ = MIN(sy1 + 1, srcHeight - 1);
             su0 = sy0 >> 1;
             su0_ = sy0_ >> 1;
-            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
-            L2fetch((unsigned int)(pSrcY + sy1 * srcWidth), L2FETCH_PARA);
-            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
+            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA_H);
+            L2fetch((unsigned int)(pSrcY + sy1 * srcWidth), L2FETCH_PARA_H);
+            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA_H);
         } else if (rotate == 90) {
             sx = MIN(srcWidth - syAry[dy], srcWidth - 1);
             sx_ = MAX(sx - 1, 0);
+            L2fetch((unsigned int)(pSrcY + sx_), L2FETCH_PARA_V);
+            L2fetch((unsigned int)(pSrcY + sx), L2FETCH_PARA_V);
+            L2fetch((unsigned int)(pSrcU + (sx - sx % 2)), L2FETCH_PARA_V);
         } else if(rotate == 180) {
             sy0 = MIN(srcHeight - syAry[dy], srcHeight - 1);
             sy0_ = MAX(sy0 - 1, 0);
@@ -332,12 +335,15 @@ static void pre_process_nv12_callback(void *data)
             sy1_ = MAX(sy1 - 1, 0);
             su0 = sy0 >> 1;
             su0_ = sy0_ >> 1;
-            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
-            L2fetch((unsigned int)(pSrcY + sy1 * srcWidth), L2FETCH_PARA);
-            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
+            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA_H);
+            L2fetch((unsigned int)(pSrcY + sy1 * srcWidth), L2FETCH_PARA_H);
+            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA_H);
         } else {
             sx = syAry[dy];
             sx_ = MIN(sx + 1, srcWidth - 1);
+            L2fetch((unsigned int)(pSrcY + sx), L2FETCH_PARA_V);
+            L2fetch((unsigned int)(pSrcY + sx_), L2FETCH_PARA_V);
+            L2fetch((unsigned int)(pSrcU + (sx - sx % 2)), L2FETCH_PARA_V);
         }
 
         int32_t dx = 0;
@@ -767,21 +773,27 @@ static void pre_process_nv12_callback(void *data)
             sy0_ = MIN(sy0 + 1, srcHeight - 1);
             su0 = sy0 >> 1;
             su0_ = sy0_ >> 1;
-            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
-            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
+            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA_H);
+            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA_H);
         } else if (rotate == 90) {
             sx = MIN(srcWidth - syAry[dy], srcWidth - 1);
             sx_ = MAX(sx - 1, 0);
+            L2fetch((unsigned int)(pSrcY + sx_), L2FETCH_PARA_V);
+            L2fetch((unsigned int)(pSrcY + sx), L2FETCH_PARA_V);
+            L2fetch((unsigned int)(pSrcU + (sx - sx % 2)), L2FETCH_PARA_V);
         } else if(rotate == 180) {
             sy0 = MIN(srcHeight - syAry[dy], srcHeight - 1);
             sy0_ = MAX(sy0 - 1, 0);
             su0 = sy0 >> 1;
             su0_ = sy0_ >> 1;
-            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA);
-            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA);
+            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA_H);
+            L2fetch((unsigned int)(pSrcU + su0 * srcWidth), L2FETCH_PARA_H);
         } else {
             sx = syAry[dy];
             sx_ = MIN(sx + 1, srcWidth - 1);
+            L2fetch((unsigned int)(pSrcY + sx_), L2FETCH_PARA_V);
+            L2fetch((unsigned int)(pSrcY + sx), L2FETCH_PARA_V);
+            L2fetch((unsigned int)(pSrcU + (sx - sx % 2)), L2FETCH_PARA_V);
         }
 
         int32_t dx = 0;
