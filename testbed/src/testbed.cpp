@@ -126,7 +126,13 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    memset(dspDstBuf, 0, dstLen * sizeof(unsigned char));
+    func_ptr pre_process_gray_hvx = reinterpret_cast<func_ptr>(dlsym(H, "pre_process_gray_resize_rotate"));
+    if (!pre_process_gray_hvx) {
+        printf("---ERROR, pre_process_gray_hvx not found\n");
+        dlclose(H);
+        return -1;
+    }
+
     int n = 0;
     {
         ccosttime a("pre_process_nv12_ori");
@@ -169,6 +175,43 @@ int main(int argc, char **argv)
     cv::Mat img(outHeight, outWidth, CV_8UC3, dspDstBuf);
     cv::imwrite("/data/local/tmp/HVX_test/hvx_outimg.bmp", img);
 
+    int32_t grayBufLen = outWidth * outHeight;
+    unsigned char *dspGrayBuf = nullptr;
+    if (0 == (dspGrayBuf = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, grayBufLen))) {
+        printf("---Error: alloc dspSrcBuf failed\n");
+        return -1;
+    }
+
+    cv::Mat gray_img(outHeight, outWidth, CV_8UC1, dspGrayBuf);
+    cv::cvtColor(dsp_img, gray_img, COLOR_BGR2GRAY);
+    cv::imwrite("/data/local/tmp/HVX_test/gray_img.bmp", gray_img);
+
+    int gray_width = 380;
+    int gray_height = 640;
+    int32_t grayBufLen1 = alignSize(gray_width, 128) * gray_height;
+    unsigned char *dspGrayBuf1 = nullptr;
+    if (0 == (dspGrayBuf1 = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, grayBufLen1))) {
+        printf("---Error: alloc dspSrcBuf failed\n");
+        return -1;
+    }
+
+    {
+        ccosttime a("pre_process_gray");
+        for (int i = 0; i < 10; ++i) {
+            n = pre_process_gray_hvx(dspGrayBuf, grayBufLen, outWidth, outHeight,
+                                     dspGrayBuf1, grayBufLen1, gray_width, gray_height, 0);
+        }
+    }
+
+    if (n != 0) {
+        printf("gray process hvx on DSP failed, err = %d\n", n);
+    } else {
+        printf("gray process hvx succ!\n");
+    }
+
+    cv::Mat out_gray_img(gray_height, alignSize(gray_width, 128), CV_8UC1, dspGrayBuf1);
+    cv::imwrite("/data/local/tmp/HVX_test/hvx_gray_img.bmp", out_gray_img);
+
     dlclose(H);
 #endif
 
@@ -182,6 +225,10 @@ FAIL:
         rpcmem_free(dspDstBuf);
     if (dspDstBuf1)
         rpcmem_free(dspDstBuf1);
+    if (dspGrayBuf)
+        rpcmem_free(dspGrayBuf);
+    if (dspGrayBuf1)
+        rpcmem_free(dspGrayBuf1);
 
     rpcmem_deinit();
     return 0;
