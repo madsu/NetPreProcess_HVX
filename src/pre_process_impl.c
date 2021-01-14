@@ -555,6 +555,10 @@ static void pre_process_nv12_callback(void *data)
             *prgb1++ = Q6_V_hi_W(dIffBGR);
         }
 
+        if (remainX <= 0) {
+            continue;
+        }
+
         for (int32_t idx = 0; idx < remainX; ++idx) {
             if (rotate == 0) {
                 sx = sxAry[dx + idx];
@@ -933,6 +937,10 @@ static void pre_process_nv12_callback(void *data)
             dIffBGR = Q6_W_vshuff_VVR(sIffG, sIBR, const_1);
             *prgb0++ = Q6_V_lo_W(dIffBGR);
             *prgb0++ = Q6_V_hi_W(dIffBGR);
+        }
+
+        if (remainX <= 0) {
+            continue;
         }
 
         //load YUV to buf;
@@ -1349,6 +1357,10 @@ static void pre_process_gray_callback(void *data)
             HVX_Vector s1 = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00L), Q6_V_lo_W(s00L), 8);
             HVX_Vector resY0 = Q6_Vub_vsat_VhVh(s0, s1);
             *prgb0++ = resY0;
+        }
+
+        if (remainX <= 0) {
+            continue;
         }
 
         for (int32_t idx = 0; idx < remainX; ++idx) {
