@@ -1227,9 +1227,36 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     return 0;
 }
 
+#define MAX_WORKER_NUM (1)
+typedef struct
+{
+    dspCV_synctoken_t *token;
+    int32_t retval;
+    int32_t threadIdx;
+    int32_t threadCount;
+
+    const uint8_t *pSrcImg;
+    int32_t srcWidth;
+    int32_t srcHeight;
+    uint8_t *pDstImg;
+    int32_t dstWidth;
+    int32_t dstHeight;
+    int32_t rotate;
+
+    int16_t *sx0Ary;
+    int16_t *sx1Ary;
+    int16_t *syAry;
+    uint16_t *fuAry;
+    uint16_t *fvAry;
+    uint8_t *vtcmSrc0[MAX_WORKER_NUM];
+    uint8_t *vtcmSrc1[MAX_WORKER_NUM];
+    uint8_t *vtcmRes0[MAX_WORKER_NUM];
+    uint8_t *vtcmRes1[MAX_WORKER_NUM];
+} grayhvx_callback_t;
+
 static void pre_process_gray_callback(void *data)
 {
-    nv12hvx_callback_t *dptr = (nv12hvx_callback_t *)data;
+    grayhvx_callback_t *dptr = (grayhvx_callback_t *)data;
     int32_t tid = dspCV_atomic_inc_return(&(dptr->threadIdx)) - 1;
     int32_t NUM_THREADS = dptr->threadCount;
 
@@ -1239,11 +1266,21 @@ static void pre_process_gray_callback(void *data)
     uint8_t *pDstImg = dptr->pDstImg;
     int32_t dstWidth = dptr->dstWidth;
     int32_t dstHeight = dptr->dstHeight;
-    int32_t *sxAry = dptr->sxAry;
-    int32_t *syAry = dptr->syAry;
+    int16_t *sx0Ary = dptr->sx0Ary;
+    int16_t *sx1Ary = dptr->sx1Ary;
+    int16_t *syAry = dptr->syAry;
     uint16_t *fuAry = dptr->fuAry;
     uint16_t *fvAry = dptr->fvAry;
     int32_t rotate = dptr->rotate;
+    uint8_t *vtcmSrc0 = dptr->vtcmSrc0[tid];
+    uint8_t *vtcmSrc1 = dptr->vtcmSrc1[tid];
+    uint8_t *vtcmRes0 = dptr->vtcmRes0[tid];
+    uint8_t *vtcmRes1 = dptr->vtcmRes1[tid];
+
+    HVX_Vector *vSrc0 = (HVX_Vector *)(vtcmSrc0);
+    HVX_Vector *vSrc1 = (HVX_Vector *)(vtcmSrc1);
+    HVX_Vector *vRes0 = (HVX_Vector *)(vtcmRes0);
+    HVX_Vector *vRes1 = (HVX_Vector *)(vtcmRes1);
 
     const uint8_t *pSrcY = pSrcImg;
     uint8_t *pDst = pDstImg;
@@ -1262,20 +1299,13 @@ static void pre_process_gray_callback(void *data)
     int32_t remainX = dstWidth - (nnX * VECLEN);
     uint64_t L2FETCH_PARA_H = CreateL2pfParam(srcWidth, srcWidth, 2, 0);
     uint64_t L2FETCH_PARA_V = CreateL2pfParam(srcWidth, 2, srcHeight, 1);
-
-    //alloc buf
-    uint8_t *buf = (uint8_t *)memalign(VECLEN, sizeof(uint8_t) * VECLEN * 4);
-    uint8_t *pX0Y0y0 = buf;
-    uint8_t *pX1Y0y0 = buf + VECLEN * 1;
-    uint8_t *pX0Y1y0 = buf + VECLEN * 2;
-    uint8_t *pX1Y1y0 = buf + VECLEN * 3;
-    HVX_Vector *vX0Y0y0 = (HVX_Vector *)(pX0Y0y0);
-    HVX_Vector *vX1Y0y0 = (HVX_Vector *)(pX1Y0y0);
-    HVX_Vector *vX0Y1y0 = (HVX_Vector *)(pX0Y1y0);
-    HVX_Vector *vX1Y1y0 = (HVX_Vector *)(pX1Y1y0);
+    int32_t gatherLimit = MAX(srcWidth, srcHeight);
 
     const int scale = 1 << 8;
     HVX_Vector vVScaleh = Q6_Vh_vsplat_R(scale);
+    HVX_VectorPred q0 = Q6_Q_vsetq2_R(128);
+    HVX_VectorPred q1 = Q6_Q_not_Q(q0);
+    HVX_VectorPred q2 = Q6_Qb_vshuffe_QhQh(q1, q0);
 
     int32_t dy = startY;
     for (int32_t i = 0; i < dstRows; dy++, i++) {
@@ -1290,43 +1320,53 @@ static void pre_process_gray_callback(void *data)
             sy0 = syAry[dy];
             sy0_ = MIN(sy0 + 1, srcHeight - 1);
             L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA_H);
+            memcpy(vtcmSrc0, pSrcY + sy0 * srcWidth, srcWidth);
+            memcpy(vtcmSrc1, pSrcY + sy0_ * srcWidth, srcWidth);
         } else if (rotate == 90) {
             sx = MIN(srcWidth - syAry[dy], srcWidth - 1);
             sx_ = MAX(sx - 1, 0);
             L2fetch((unsigned int)(pSrcY + sx_), L2FETCH_PARA_V);
+            for (int32_t i = 0; i < srcHeight; ++i) {
+                vtcmSrc0[i] = pSrcY[i * srcWidth + sx];
+                vtcmSrc1[i] = pSrcY[i * srcWidth + sx_];
+            }
         } else if(rotate == 180) {
-            sy0 = MIN(srcHeight - syAry[dy], srcHeight - 1);
+            sy0 = MIN(srcHeight - 1 - syAry[dy], srcHeight - 1);
             sy0_ = MAX(sy0 - 1, 0);
-            L2fetch((unsigned int)(pSrcY + sy0 * srcWidth), L2FETCH_PARA_H);
+            L2fetch((unsigned int)(pSrcY + sy0_ * srcWidth), L2FETCH_PARA_H);
+            memcpy(vtcmSrc0, pSrcY + sy0 * srcWidth, srcWidth);
+            memcpy(vtcmSrc1, pSrcY + sy0_ * srcWidth, srcWidth);
         } else {
             sx = syAry[dy];
             sx_ = MIN(sx + 1, srcWidth - 1);
             L2fetch((unsigned int)(pSrcY + sx), L2FETCH_PARA_V);
+            for (int32_t i = 0; i < srcHeight; ++i) {
+                vtcmSrc0[srcHeight - 1 - i] = pSrcY[i * srcWidth + sx];
+                vtcmSrc1[srcHeight - 1 - i] = pSrcY[i * srcWidth + sx_];
+            }
         }
 
         int32_t dx = 0;
         for (int32_t n = 0; n < nnX; n++, dx += VECLEN) {
-            //load YUV to buf;
-            for (int32_t idx = 0; idx < VECLEN; ++idx) {
-                if (rotate == 0) {
-                    sx = sxAry[dx + idx];
-                    sx_ = MIN(sx + 1, srcWidth - 1);
-                } else if(rotate == 90) {
-                    sy0 = sxAry[dx + idx];
-                    sy0_ = MIN(sy0 + 1, srcHeight - 1);
-                } else if(rotate == 180) {
-                    sx = MIN(srcWidth - sxAry[dx + idx], srcWidth - 1);
-                    sx_ = MAX(sx - 1, 0);
-                } else {
-                    sy0 = MIN(srcHeight - sxAry[dx + idx], srcHeight - 1);
-                    sy0_ = MAX(sy0 - 1, 0);
-                }
+            HVX_Vector *offset = (HVX_Vector *)(sx0Ary + dx);
+            Q6_vgather_AQRMVh(vRes0, q2, (int32_t)vtcmSrc0, gatherLimit, *offset++);
+            Q6_vgather_AQRMVh(vRes1, q2, (int32_t)vtcmSrc0, gatherLimit, *offset);
+            HVX_VectorPair wX0Y0 = Q6_Wuh_vzxt_Vub(Q6_Vub_vpack_VhVh_sat(vRes1[0], vRes0[0]));
 
-                pX0Y0y0[idx] = pSrcY[sy0 * srcWidth + sx];
-                pX1Y0y0[idx] = pSrcY[sy0 * srcWidth + sx_];
-                pX0Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx];
-                pX1Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx_];
-            }
+            offset = (HVX_Vector *)(sx1Ary + dx);
+            Q6_vgather_AQRMVh(vRes0, q2, (int32_t)vtcmSrc0, gatherLimit, *offset++);
+            Q6_vgather_AQRMVh(vRes1, q2, (int32_t)vtcmSrc0, gatherLimit, *offset);
+            HVX_VectorPair wX1Y0 = Q6_Wuh_vzxt_Vub(Q6_Vub_vpack_VhVh_sat(vRes1[0], vRes0[0]));
+
+            offset = (HVX_Vector *)(sx0Ary + dx);
+            Q6_vgather_AQRMVh(vRes0, q2, (int32_t)vtcmSrc1, gatherLimit, *offset++);
+            Q6_vgather_AQRMVh(vRes1, q2, (int32_t)vtcmSrc1, gatherLimit, *offset);
+            HVX_VectorPair wX0Y1 = Q6_Wuh_vzxt_Vub(Q6_Vub_vpack_VhVh_sat(vRes1[0], vRes0[0]));
+
+            offset = (HVX_Vector *)(sx1Ary + dx);
+            Q6_vgather_AQRMVh(vRes0, q2, (int32_t)vtcmSrc1, gatherLimit, *offset++);
+            Q6_vgather_AQRMVh(vRes1, q2, (int32_t)vtcmSrc1, gatherLimit, *offset);
+            HVX_VectorPair wX1Y1 = Q6_Wuh_vzxt_Vub(Q6_Vub_vpack_VhVh_sat(vRes1[0], vRes0[0]));
 
             //Load fu
             HVX_VectorPair *pU0 = (HVX_VectorPair *)(fuAry + dx);
@@ -1335,16 +1375,11 @@ static void pre_process_gray_callback(void *data)
             HVX_Vector vU1uhH = Q6_Vuh_vsub_VuhVuh_sat(vVScaleh, vU0uhH);
             HVX_Vector vU1uhL = Q6_Vuh_vsub_VuhVuh_sat(vVScaleh, vU0uhL);
 
-            //compute Y0
-            HVX_VectorPair wX0Y0h = Q6_Wuh_vzxt_Vub(vX0Y0y0[0]);
-            HVX_VectorPair wX1Y0h = Q6_Wuh_vzxt_Vub(vX1Y0y0[0]);
-            HVX_VectorPair wX0Y1h = Q6_Wuh_vzxt_Vub(vX0Y1y0[0]);
-            HVX_VectorPair wX1Y1h = Q6_Wuh_vzxt_Vub(vX1Y1y0[0]);
-
-            HVX_VectorPair s00H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_hi_W(wX0Y0h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_hi_W(wX1Y0h)));
-            HVX_VectorPair s00L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_lo_W(wX0Y0h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_lo_W(wX1Y0h)));
-            HVX_VectorPair s01H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_hi_W(wX0Y1h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_hi_W(wX1Y1h)));
-            HVX_VectorPair s01L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_lo_W(wX0Y1h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_lo_W(wX1Y1h)));
+            //compute Gray
+            HVX_VectorPair s00H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_hi_W(wX0Y0)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_hi_W(wX1Y0)));
+            HVX_VectorPair s00L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_lo_W(wX0Y0)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_lo_W(wX1Y0)));
+            HVX_VectorPair s01H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_hi_W(wX0Y1)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_hi_W(wX1Y1)));
+            HVX_VectorPair s01L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_lo_W(wX0Y1)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_lo_W(wX1Y1)));
 
             HVX_Vector s0H = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00H), Q6_V_lo_W(s00H), 8);
             HVX_Vector s0L = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00L), Q6_V_lo_W(s00L), 8);
@@ -1363,26 +1398,25 @@ static void pre_process_gray_callback(void *data)
             continue;
         }
 
-        for (int32_t idx = 0; idx < remainX; ++idx) {
-            if (rotate == 0) {
-                sx = sxAry[dx + idx];
-                sx_ = MIN(sx + 1, srcWidth - 1);
-            } else if (rotate == 90) {
-                sy0 = sxAry[dx + idx];
-                sy0_ = MIN(sy0 + 1, srcHeight - 1);
-            } else if (rotate == 180) {
-                sx = MIN(srcWidth - sxAry[dx + idx], srcWidth - 1);
-                sx_ = MAX(sx - 1, 0);
-            } else {
-                sy0 = MIN(srcHeight - sxAry[dx + idx], srcHeight - 1);
-                sy0_ = MAX(sy0 - 1, 0);
-            }
+        HVX_Vector *offset = (HVX_Vector *)(sx0Ary + dx);
+        Q6_vgather_AQRMVh(vRes0, q2, (int32_t)vtcmSrc0, gatherLimit, *offset++);
+        Q6_vgather_AQRMVh(vRes1, q2, (int32_t)vtcmSrc0, gatherLimit, *offset);
+        HVX_VectorPair wX0Y0 = Q6_Wuh_vzxt_Vub(Q6_Vub_vpack_VhVh_sat(vRes1[0], vRes0[0]));
 
-            pX0Y0y0[idx] = pSrcY[sy0 * srcWidth + sx];
-            pX1Y0y0[idx] = pSrcY[sy0 * srcWidth + sx_];
-            pX0Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx];
-            pX1Y1y0[idx] = pSrcY[sy0_ * srcWidth + sx_];
-        }
+        offset = (HVX_Vector *)(sx1Ary + dx);
+        Q6_vgather_AQRMVh(vRes0, q2, (int32_t)vtcmSrc0, gatherLimit, *offset++);
+        Q6_vgather_AQRMVh(vRes1, q2, (int32_t)vtcmSrc0, gatherLimit, *offset);
+        HVX_VectorPair wX1Y0 = Q6_Wuh_vzxt_Vub(Q6_Vub_vpack_VhVh_sat(vRes1[0], vRes0[0]));
+
+        offset = (HVX_Vector *)(sx0Ary + dx);
+        Q6_vgather_AQRMVh(vRes0, q2, (int32_t)vtcmSrc1, gatherLimit, *offset++);
+        Q6_vgather_AQRMVh(vRes1, q2, (int32_t)vtcmSrc1, gatherLimit, *offset);
+        HVX_VectorPair wX0Y1 = Q6_Wuh_vzxt_Vub(Q6_Vub_vpack_VhVh_sat(vRes1[0], vRes0[0]));
+
+        offset = (HVX_Vector *)(sx1Ary + dx);
+        Q6_vgather_AQRMVh(vRes0, q2, (int32_t)vtcmSrc1, gatherLimit, *offset++);
+        Q6_vgather_AQRMVh(vRes1, q2, (int32_t)vtcmSrc1, gatherLimit, *offset);
+        HVX_VectorPair wX1Y1 = Q6_Wuh_vzxt_Vub(Q6_Vub_vpack_VhVh_sat(vRes1[0], vRes0[0]));
 
         //Load fu
         HVX_VectorPair *pU0 = (HVX_VectorPair *)(fuAry + dx);
@@ -1391,16 +1425,11 @@ static void pre_process_gray_callback(void *data)
         HVX_Vector vU1uhH = Q6_Vuh_vsub_VuhVuh_sat(vVScaleh, vU0uhH);
         HVX_Vector vU1uhL = Q6_Vuh_vsub_VuhVuh_sat(vVScaleh, vU0uhL);
 
-        //compute Y0
-        HVX_VectorPair wX0Y0h = Q6_Wuh_vzxt_Vub(vX0Y0y0[0]);
-        HVX_VectorPair wX1Y0h = Q6_Wuh_vzxt_Vub(vX1Y0y0[0]);
-        HVX_VectorPair wX0Y1h = Q6_Wuh_vzxt_Vub(vX0Y1y0[0]);
-        HVX_VectorPair wX1Y1h = Q6_Wuh_vzxt_Vub(vX1Y1y0[0]);
-
-        HVX_VectorPair s00H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_hi_W(wX0Y0h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_hi_W(wX1Y0h)));
-        HVX_VectorPair s00L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_lo_W(wX0Y0h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_lo_W(wX1Y0h)));
-        HVX_VectorPair s01H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_hi_W(wX0Y1h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_hi_W(wX1Y1h)));
-        HVX_VectorPair s01L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_lo_W(wX0Y1h)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_lo_W(wX1Y1h)));
+        //compute Gray
+        HVX_VectorPair s00H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_hi_W(wX0Y0)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_hi_W(wX1Y0)));
+        HVX_VectorPair s00L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_lo_W(wX0Y0)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_lo_W(wX1Y0)));
+        HVX_VectorPair s01H = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_hi_W(wX0Y1)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_hi_W(wX1Y1)));
+        HVX_VectorPair s01L = Q6_Wuw_vadd_WuwWuw_sat(Q6_Wuw_vmpy_VuhVuh(vU1uhH, Q6_V_lo_W(wX0Y1)), Q6_Wuw_vmpy_VuhVuh(vU0uhH, Q6_V_lo_W(wX1Y1)));
 
         HVX_Vector s0H = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00H), Q6_V_lo_W(s00H), 8);
         HVX_Vector s0L = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00L), Q6_V_lo_W(s00L), 8);
@@ -1413,11 +1442,6 @@ static void pre_process_gray_callback(void *data)
         HVX_Vector s1 = Q6_Vuh_vasr_VuwVuwR_sat(Q6_V_hi_W(s00L), Q6_V_lo_W(s00L), 8);
         HVX_Vector resY0 = Q6_Vub_vsat_VhVh(s0, s1);
         *prgb0++ = resY0;
-    }
-
-    if (buf != NULL) {
-        free(buf);
-        buf = NULL;
     }
 
     dspCV_worker_pool_synctoken_jobdone(dptr->token);
@@ -1462,11 +1486,14 @@ int pre_process_gray_resize_rotate(const uint8 *pSrc, int pSrcLen, int srcWidth,
 
     //计算xy在原图上的坐标
     uint8_t *ptr = (uint8_t *)vtcm;
-    int *sxAry = (int *)ptr;
-    ptr += roundup_t(dstWidth * sizeof(int), VECLEN);
+    int16_t *sx0Ary = (int16_t *)ptr;
+    ptr += roundup_t(dstWidth * sizeof(int16_t), VECLEN);
 
-    int *syAry = (int *)ptr;
-    ptr += roundup_t(dstHeight * sizeof(int), VECLEN);
+    int16_t *sx1Ary = (int16_t *)ptr;
+    ptr += roundup_t(dstWidth * sizeof(int16_t), VECLEN);
+
+    int16_t *syAry = (int16_t *)ptr;
+    ptr += roundup_t(dstHeight * sizeof(int16_t), VECLEN);
 
     uint16_t *fuAry = (uint16_t *)ptr;
     ptr += roundup_t(dstWidth * sizeof(uint16_t), VECLEN);
@@ -1478,7 +1505,7 @@ int pre_process_gray_resize_rotate(const uint8 *pSrc, int pSrcLen, int srcWidth,
     for (int dx = 0; dx < dstWidth; ++dx) {
         float fx = (float)((dx + 0.5) * xratio - 0.5);
 
-        int x = (int)floor(fx);
+        int16_t x = (int16_t)floor(fx);
         float u = fx - x;
         if (x < 0) {
             x = 0;
@@ -1493,14 +1520,20 @@ int pre_process_gray_resize_rotate(const uint8 *pSrc, int pSrcLen, int srcWidth,
             u = 0.f;
         }
 
-        sxAry[dx] = x;
+        if (rotate == 180) {
+            sx0Ary[dx] = srcWidth - 1 - x;
+            sx1Ary[dx] = MAX(sx0Ary[dx] - 1, 0);
+        } else {
+            sx0Ary[dx] = x;
+            sx1Ary[dx] = MAX(x + 1, 0);
+        }
         fuAry[dx] = (uint16_t)(u * scale);
     }
 
     for (int dy = 0; dy < dstHeight; ++dy) {
         float fy = (float)((dy + 0.5f) * yratio - 0.5f);
 
-        int y = (int)floor(fy);
+        int16_t y = (int16_t)floor(fy);
         float v = fy - y;
         if (y < 0) {
             y = 0;
@@ -1521,7 +1554,7 @@ int pre_process_gray_resize_rotate(const uint8 *pSrc, int pSrcLen, int srcWidth,
 
     dspCV_worker_job_t job;
     dspCV_synctoken_t token;
-    nv12hvx_callback_t dptr;
+    grayhvx_callback_t dptr;
     dptr.retval = 0;
     dptr.token = &token;
 
@@ -1533,19 +1566,34 @@ int pre_process_gray_resize_rotate(const uint8 *pSrc, int pSrcLen, int srcWidth,
     dptr.dstHeight = dstHeight;
     dptr.rotate = rotate;
 
-    dptr.sxAry = sxAry;
+    dptr.sx0Ary = sx0Ary;
+    dptr.sx1Ary = sx1Ary;
     dptr.syAry = syAry;
     dptr.fuAry = fuAry;
     dptr.fvAry = fvAry;
     dptr.threadIdx = 0;
+    dptr.threadCount = MAX_WORKER_NUM;
 
-    int numWorkers = 4;
-    dptr.threadCount = numWorkers;
+    int32_t maxSrcBorder = MAX(srcHeight, srcWidth);
+    for (int32_t i = 0; i < MAX_WORKER_NUM; ++i) {
+        dptr.vtcmSrc0[i] = ptr;
+        ptr += roundup_t(maxSrcBorder, VECLEN);
+        dptr.vtcmSrc1[i] = ptr;
+        ptr += roundup_t(maxSrcBorder, VECLEN);
+    }
+
+    for (int32_t i = 0; i < MAX_WORKER_NUM; ++i) {
+        dptr.vtcmRes0[i] = ptr;
+        ptr += VECLEN;
+        dptr.vtcmRes1[i] = ptr;
+        ptr += VECLEN;
+    }
+
     job.dptr = (void *)&dptr;
     job.fptr = pre_process_gray_callback;
-    dspCV_worker_pool_synctoken_init(&token, numWorkers);
+    dspCV_worker_pool_synctoken_init(&token, dptr.threadCount);
 
-    for (int i = 0; i < numWorkers; ++i) {
+    for (int i = 0; i < dptr.threadCount; ++i) {
         dspCV_worker_pool_submit(job);
     }
 
