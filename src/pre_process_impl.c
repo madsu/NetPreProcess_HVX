@@ -227,7 +227,7 @@ static void pre_process_nv12_callback(void *data)
     int32_t tid = dspCV_atomic_inc_return(&(dptr->threadIdx)) - 1;
     int32_t NUM_THREADS = dptr->threadCount;
 
-    uint8_t *pSrcImg = dptr->pSrcImg;
+    const uint8_t *pSrcImg = dptr->pSrcImg;
     int32_t srcWidth = dptr->srcWidth;
     int32_t srcHeight = dptr->srcHeight;
     uint8_t *pDstImg = dptr->pDstImg;
@@ -240,8 +240,8 @@ static void pre_process_nv12_callback(void *data)
     int32_t rotate = dptr->rotate;
 
     const uint8_t *pSrcY = pSrcImg;
-    const uint8_t *pSrcU = pSrcY + srcHeight * srcWidth;
-    const uint8_t *pSrcV = pSrcU + 1;
+    const uint8_t *pSrcU = (const uint8_t *)(pSrcY + srcHeight * srcWidth);
+    const uint16_t *pSrcUV = (const uint16_t *)(pSrcU);
     uint8_t *pDst = pDstImg;
     int32_t dstStride = roundup_t(dstWidth, VECLEN) * 4;
 
@@ -271,10 +271,10 @@ static void pre_process_nv12_callback(void *data)
     uint8_t *pX1Y0y1 = buf + VECLEN * 5;
     uint8_t *pX0Y1y1 = buf + VECLEN * 6;
     uint8_t *pX1Y1y1 = buf + VECLEN * 7;
-    uint8_t *pX0Y0uv = buf + VECLEN * 8;
-    uint8_t *pX0Y1uv = buf + VECLEN * 9;
-    uint8_t *pX1Y0uv = buf + VECLEN * 10;
-    uint8_t *pX1Y1uv = buf + VECLEN * 11;
+    uint16_t *pX0Y0uv = (uint16_t *)(buf + VECLEN * 8);
+    uint16_t *pX0Y1uv = (uint16_t *)(buf + VECLEN * 9);
+    uint16_t *pX1Y0uv = (uint16_t *)(buf + VECLEN * 10);
+    uint16_t *pX1Y1uv = (uint16_t *)(buf + VECLEN * 11);
     HVX_Vector *vX0Y0y0 = (HVX_Vector *)(pX0Y0y0);
     HVX_Vector *vX1Y0y0 = (HVX_Vector *)(pX1Y0y0);
     HVX_Vector *vX0Y1y0 = (HVX_Vector *)(pX0Y1y0);
@@ -386,15 +386,10 @@ static void pre_process_nv12_callback(void *data)
                 int32_t sux = sx - sx % 2;
                 int32_t sux_ = sx_ - sx_ % 2;
                 if (idx % 2 == 0) {
-                    pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sux];
-                    pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sux_];
-                    pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sux];
-                    pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sux_];
-                } else {
-                    pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sux];
-                    pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sux_];
-                    pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sux];
-                    pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sux_];
+                    pX0Y0uv[idx >> 1] = pSrcUV[(su0 * srcWidth + sux) >> 1];
+                    pX1Y0uv[idx >> 1] = pSrcUV[(su0 * srcWidth + sux_) >> 1];
+                    pX0Y1uv[idx >> 1] = pSrcUV[(su0_ * srcWidth + sux) >> 1];
+                    pX1Y1uv[idx >> 1] = pSrcUV[(su0_ * srcWidth + sux_) >> 1];
                 }
             }
 
@@ -596,15 +591,10 @@ static void pre_process_nv12_callback(void *data)
             int32_t sux = sx - sx % 2;
             int32_t sux_ = sx_ - sx_ % 2;
             if (idx % 2 == 0) {
-                pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sux];
-                pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sux_];
-                pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sux];
-                pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sux_];
-            } else {
-                pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sux];
-                pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sux_];
-                pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sux];
-                pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sux_];
+                pX0Y0uv[idx >> 1] = pSrcUV[(su0 * srcWidth + sux) >> 1];
+                pX1Y0uv[idx >> 1] = pSrcUV[(su0 * srcWidth + sux_) >> 1];
+                pX0Y1uv[idx >> 1] = pSrcUV[(su0_ * srcWidth + sux) >> 1];
+                pX1Y1uv[idx >> 1] = pSrcUV[(su0_ * srcWidth + sux_) >> 1];
             }
         }
 
@@ -830,15 +820,10 @@ static void pre_process_nv12_callback(void *data)
                 int32_t sux = sx - sx % 2;
                 int32_t sux_ = sx_ - sx_ % 2;
                 if (idx % 2 == 0) {
-                    pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sux];
-                    pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sux_];
-                    pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sux];
-                    pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sux_];
-                } else {
-                    pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sux];
-                    pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sux_];
-                    pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sux];
-                    pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sux_];
+                    pX0Y0uv[idx >> 1] = pSrcUV[(su0 * srcWidth + sux) >> 1];
+                    pX1Y0uv[idx >> 1] = pSrcUV[(su0 * srcWidth + sux_) >> 1];
+                    pX0Y1uv[idx >> 1] = pSrcUV[(su0_ * srcWidth + sux) >> 1];
+                    pX1Y1uv[idx >> 1] = pSrcUV[(su0_ * srcWidth + sux_) >> 1];
                 }
             }
 
@@ -971,15 +956,10 @@ static void pre_process_nv12_callback(void *data)
             int32_t sux = sx - sx % 2;
             int32_t sux_ = sx_ - sx_ % 2;
             if (idx % 2 == 0) {
-                pX0Y0uv[idx] = pSrcU[su0 * srcWidth + sux];
-                pX1Y0uv[idx] = pSrcU[su0 * srcWidth + sux_];
-                pX0Y1uv[idx] = pSrcU[su0_ * srcWidth + sux];
-                pX1Y1uv[idx] = pSrcU[su0_ * srcWidth + sux_];
-            } else {
-                pX0Y0uv[idx] = pSrcV[su0 * srcWidth + sux];
-                pX1Y0uv[idx] = pSrcV[su0 * srcWidth + sux_];
-                pX0Y1uv[idx] = pSrcV[su0_ * srcWidth + sux];
-                pX1Y1uv[idx] = pSrcV[su0_ * srcWidth + sux_];
+                pX0Y0uv[idx >> 1] = pSrcUV[(su0 * srcWidth + sux) >> 1];
+                pX1Y0uv[idx >> 1] = pSrcUV[(su0 * srcWidth + sux_) >> 1];
+                pX0Y1uv[idx >> 1] = pSrcUV[(su0_ * srcWidth + sux) >> 1];
+                pX1Y1uv[idx >> 1] = pSrcUV[(su0_ * srcWidth + sux_) >> 1];
             }
         }
 
@@ -1127,11 +1107,11 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
 
     //计算xy在原图上的坐标
     uint8_t *ptr = (uint8_t *)vtcm;
-    int *sxAry = (int *)ptr;
-    ptr += roundup_t(dstWidth * sizeof(int), VECLEN);
+    int32_t *sxAry = (int32_t *)ptr;
+    ptr += roundup_t(dstWidth * sizeof(int32_t), VECLEN);
 
-    int *syAry = (int *)ptr;
-    ptr += roundup_t(dstHeight * sizeof(int), VECLEN);
+    int32_t *syAry = (int32_t *)ptr;
+    ptr += roundup_t(dstHeight * sizeof(int32_t), VECLEN);
 
     uint16_t *fuAry = (uint16_t *)ptr;
     ptr += roundup_t(dstWidth * sizeof(uint16_t), VECLEN);
@@ -1260,7 +1240,7 @@ static void pre_process_gray_callback(void *data)
     int32_t tid = dspCV_atomic_inc_return(&(dptr->threadIdx)) - 1;
     int32_t NUM_THREADS = dptr->threadCount;
 
-    uint8_t *pSrcImg = dptr->pSrcImg;
+    const uint8_t *pSrcImg = dptr->pSrcImg;
     int32_t srcWidth = dptr->srcWidth;
     int32_t srcHeight = dptr->srcHeight;
     uint8_t *pDstImg = dptr->pDstImg;
