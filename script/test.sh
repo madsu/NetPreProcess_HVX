@@ -14,4 +14,6 @@ adb push ../release/libdspCV_skel.so /data/local/tmp/HVX_test
 adb push ../release/libc++_shared.so /data/local/tmp/HVX_test
 
 adb shell export LD_LIBRARY_PATH=/data/local/tmp/HVX_test:/vendor/lib64/:$LD_LIBRARY_PATH ADSP_LIBRARY_PATH="/vendor/lib/rfsa/dsp/sdk\;/vendor/lib/rfsa/dsp/testsig;" /data/local/tmp/HVX_test/DSPDemo /data/local/tmp/HVX_test/0.nv21
+
+rm -rf ./HVX_test
 adb pull /data/local/tmp/HVX_test .

@@ -23,12 +23,12 @@ void RGBA2BGR(uint8_t *rgba, int32_t width, int32_t height, int32_t stride, uint
 
     for (int32_t y = 0; y < h; ++y) {
 #if __ARM_NEON
-        for (; nn > 0; nn--) {
+        for (int32_t k = 0; k < nn; k++) {
             uint8x8x4_t _rgba = vld4_u8(rgba);
             uint8x8x3_t _bgr;
-            _bgr.val[0] = _rgba.val[2];
+            _bgr.val[0] = _rgba.val[0];
             _bgr.val[1] = _rgba.val[1];
-            _bgr.val[2] = _rgba.val[0];
+            _bgr.val[2] = _rgba.val[2];
             vst3_u8(bgr, _bgr);
 
             rgba += 4 * 8;
@@ -36,10 +36,10 @@ void RGBA2BGR(uint8_t *rgba, int32_t width, int32_t height, int32_t stride, uint
         }
 #endif
 
-        for (; remain > 0; remain--) {
-            bgr[0] = rgba[2];
+        for (int32_t k = 0; k < remain; k++) {
+            bgr[0] = rgba[0];
             bgr[1] = rgba[1];
-            bgr[2] = rgba[0];
+            bgr[2] = rgba[2];
 
             rgba += 4;
             bgr += 3;

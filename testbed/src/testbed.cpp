@@ -58,9 +58,9 @@ int main(int argc, char **argv)
     int width = 1920;
     int height = 1080;
 
-    int outWidth = 289;
-    int outHeight = 481;
-    int rotate = 270;
+    int outWidth = 481;
+    int outHeight = 289;
+    int rotate = 0;
 
     unsigned char *image;
     LoadYUV(argv[1], width, height, &image);
@@ -68,11 +68,6 @@ int main(int argc, char **argv)
     int srcLen = sizeof(unsigned char) * width * height * 3 / 2;
     int dstLen = sizeof(unsigned char) * outWidth * outHeight * 3;
     unsigned char *dstImage = (unsigned char *)malloc(dstLen);
-
-    nv12_pre_process(image, width, height, dstImage, outWidth, outHeight, rotate);
-
-    cv::Mat cpu_img(outHeight, outWidth, CV_8UC3, dstImage);
-    cv::imwrite("/data/local/tmp/HVX_test/cpu_outimg.bmp", cpu_img);
 
     rpcmem_init();
 
@@ -96,6 +91,34 @@ int main(int argc, char **argv)
         printf("---Error: alloc dspSrcBuf failed\n");
         return -1;
     }
+    memset(dspDstBuf, 0, dstLen);
+
+    unsigned char *dspDstPadBuf = nullptr;
+    int outPadStride = alignSize(outWidth, 128) * 4;
+    int dstPadLen = sizeof(unsigned char) * outPadStride * outHeight;
+    if (0 == (dspDstPadBuf = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, dstPadLen))) {
+        printf("---Error: alloc dspSrcBuf failed\n");
+        return -1;
+    }
+    memset(dspDstPadBuf, 0, dstPadLen);
+
+    int grayBufLen = outWidth * outHeight;
+    unsigned char *dspGrayBuf = nullptr;
+    if (0 == (dspGrayBuf = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, grayBufLen))) {
+        printf("---Error: alloc dspSrcBuf failed\n");
+        return -1;
+    }
+    memset(dspGrayBuf, 0, grayBufLen);
+
+    int dstGrayWidth = 380;
+    int dstGrayHeight = 640;
+    int dstGrayLen = alignSize(dstGrayWidth, 128) * dstGrayWidth;
+    unsigned char *dspDstGrayBuf = nullptr;
+    if (0 == (dspDstGrayBuf = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, dstGrayLen))) {
+        printf("---Error: alloc dspSrcBuf failed\n");
+        return -1;
+    }
+    memset(dspDstGrayBuf, 0, dstGrayLen);
 
 #ifdef __hexagon__
     pre_process_vec_abs(testVec, 1024);
@@ -146,23 +169,23 @@ int main(int argc, char **argv)
     } else {
         printf("pre_process nv12 ori succ!\n");
     }
+    cv::Mat dsp_ori_img(outHeight, outWidth, CV_8UC3, dspDstBuf);
+    cv::imwrite("/data/local/tmp/HVX_test/dsp_ori_img.bmp", dsp_ori_img);
 
-    cv::Mat dsp_img(outHeight, outWidth, CV_8UC3, dspDstBuf);
-    cv::imwrite("/data/local/tmp/HVX_test/dsp_outimg.bmp", dsp_img);
+    //////////////////////////////////////////////////
+    n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstPadBuf, dstPadLen, outWidth, outHeight, rotate);
+    cv::Mat hvx_rgba_img(outHeight, outPadStride / 4, CV_8UC4, dspDstPadBuf);
+    cv::imwrite("/data/local/tmp/HVX_test/hvx_rgba_img.bmp", hvx_rgba_img);
 
-    unsigned char *dspDstBuf1 = nullptr;
-    int outStride = alignSize(outWidth, 128) * 4;
-    dstLen = sizeof(unsigned char) * outStride * outHeight;
-    if (0 == (dspDstBuf1 = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, dstLen))) {
-        printf("---Error: alloc dspSrcBuf failed\n");
-        return -1;
-    }
+    RGBA2BGR(dspDstPadBuf, outWidth, outHeight, outPadStride, dstImage);
+    cv::Mat hvx_bgr_img(outHeight, outWidth, CV_8UC3, dstImage);
+    cv::imwrite("/data/local/tmp/HVX_test/hvx_bgr_img.bmp", hvx_bgr_img);
 
     {
         ccosttime a("pre_process_nv12_hvx");
         for (int i = 0; i < 10; ++i) {
-            n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstBuf1, dstLen, outWidth, outHeight, rotate);
-            RGBA2BGR(dspDstBuf1, outWidth, outHeight, outStride, dspDstBuf);
+            n = pre_process_nv12_hvx(dspSrcBuf, srcLen, width, height, dspDstPadBuf, dstPadLen, outWidth, outHeight, rotate);
+            RGBA2BGR(dspDstPadBuf, outWidth, outHeight, outPadStride, dstImage);
         }
     }
 
@@ -172,34 +195,20 @@ int main(int argc, char **argv)
         printf("pre_process nv12 hvx succ!\n");
     }
 
-    cv::Mat img(outHeight, outWidth, CV_8UC3, dspDstBuf);
-    cv::imwrite("/data/local/tmp/HVX_test/hvx_outimg.bmp", img);
+    ////////////////////////////////////////////////////////////
+    cv::Mat ori_gray_img(outHeight, outWidth, CV_8UC1, dspGrayBuf);
+    cv::cvtColor(hvx_bgr_img, ori_gray_img, COLOR_BGR2GRAY);
+    cv::imwrite("/data/local/tmp/HVX_test/ori_gray_img.bmp", ori_gray_img);
 
-    int32_t grayBufLen = outWidth * outHeight;
-    unsigned char *dspGrayBuf = nullptr;
-    if (0 == (dspGrayBuf = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, grayBufLen))) {
-        printf("---Error: alloc dspSrcBuf failed\n");
-        return -1;
-    }
-
-    cv::Mat gray_img(outHeight, outWidth, CV_8UC1, dspGrayBuf);
-    cv::cvtColor(dsp_img, gray_img, COLOR_BGR2GRAY);
-    cv::imwrite("/data/local/tmp/HVX_test/gray_img.bmp", gray_img);
-
-    int gray_width = 380;
-    int gray_height = 640;
-    int32_t grayBufLen1 = alignSize(gray_width, 128) * gray_height;
-    unsigned char *dspGrayBuf1 = nullptr;
-    if (0 == (dspGrayBuf1 = (unsigned char *)rpcmem_alloc(heapid, RPCMEM_DEFAULT_FLAGS, grayBufLen1))) {
-        printf("---Error: alloc dspSrcBuf failed\n");
-        return -1;
-    }
-
+    n = pre_process_gray_hvx(dspGrayBuf, grayBufLen, outWidth, outHeight,
+                             dspDstGrayBuf, dstGrayLen, dstGrayWidth, dstGrayHeight, 0);
+    
+    /*
     {
         ccosttime a("pre_process_gray");
         for (int i = 0; i < 10; ++i) {
             n = pre_process_gray_hvx(dspGrayBuf, grayBufLen, outWidth, outHeight,
-                                     dspGrayBuf1, grayBufLen1, gray_width, gray_height, 0);
+                                     dspDstGrayBuf, dstGrayLen, dstGrayWidth, dstGrayHeight, 0);
         }
     }
 
@@ -209,8 +218,9 @@ int main(int argc, char **argv)
         printf("gray process hvx succ!\n");
     }
 
-    cv::Mat out_gray_img(gray_height, alignSize(gray_width, 128), CV_8UC1, dspGrayBuf1);
+    cv::Mat out_gray_img(dstGrayHeight, dstGrayWidth, CV_8UC1, dspDstGrayBuf);
     cv::imwrite("/data/local/tmp/HVX_test/hvx_gray_img.bmp", out_gray_img);
+    */
 
     dlclose(H);
 #endif
@@ -223,12 +233,12 @@ FAIL:
         rpcmem_free(dspSrcBuf);
     if (dspDstBuf)
         rpcmem_free(dspDstBuf);
-    if (dspDstBuf1)
-        rpcmem_free(dspDstBuf1);
+    if (dspDstPadBuf)
+        rpcmem_free(dspDstPadBuf);
     if (dspGrayBuf)
         rpcmem_free(dspGrayBuf);
-    if (dspGrayBuf1)
-        rpcmem_free(dspGrayBuf1);
+    if (dspDstGrayBuf)
+        rpcmem_free(dspDstGrayBuf);
 
     rpcmem_deinit();
     return 0;
