@@ -1106,21 +1106,24 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
     }
 
     //计算xy在原图上的坐标
+    int32_t dstWidthPad = roundup_t(dstWidth, VECLEN);
+    int32_t dstHeightPad = roundup_t(dstHeight, VECLEN);
+
     uint8_t *ptr = (uint8_t *)vtcm;
     int32_t *sxAry = (int32_t *)ptr;
-    ptr += roundup_t(dstWidth * sizeof(int32_t), VECLEN);
+    ptr += dstWidthPad * sizeof(int32_t);
 
     int32_t *syAry = (int32_t *)ptr;
-    ptr += roundup_t(dstHeight * sizeof(int32_t), VECLEN);
+    ptr += dstHeightPad * sizeof(int32_t);
 
     uint16_t *fuAry = (uint16_t *)ptr;
-    ptr += roundup_t(dstWidth * sizeof(uint16_t), VECLEN);
+    ptr += dstWidthPad * sizeof(uint16_t);
 
     uint16_t *fvAry = (uint16_t *)ptr;
-    ptr += roundup_t(dstHeight * sizeof(uint16_t), VECLEN);
+    ptr += dstHeightPad * sizeof(uint16_t);
 
     const int scale = 1 << 8;
-    for (int dx = 0; dx < dstWidth; ++dx) {
+    for (int dx = 0; dx < dstWidthPad; ++dx) {
         float fx = (float)((dx + 0.5) * xratio - 0.5);
 
         int x = (int)floor(fx);
@@ -1138,11 +1141,16 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
             u = 0.f;
         }
 
-        sxAry[dx] = x;
-        fuAry[dx] = (uint16_t)(u * scale);
+        if (dx < dstWidth) {
+            sxAry[dx] = x;
+            fuAry[dx] = (uint16_t)(u * scale);
+        } else {
+            sxAry[dx] = 0;
+            fuAry[dx] = 0;
+        }
     }
 
-    for (int dy = 0; dy < dstHeight; ++dy) {
+    for (int dy = 0; dy < dstHeightPad; ++dy) {
         float fy = (float)((dy + 0.5f) * yratio - 0.5f);
 
         int y = (int)floor(fy);
@@ -1160,8 +1168,13 @@ int pre_process_nv12_hvx(const uint8 *pSrc, int pSrcLen, int srcWidth, int srcHe
             v = 0.f;
         }
 
-        syAry[dy] = y;
-        fvAry[dy] = (uint16_t)(v * scale);
+        if (dy < dstHeight) {
+            syAry[dy] = y;
+            fvAry[dy] = (uint16_t)(v * scale);
+        } else {
+            syAry[dy] = 0;
+            fvAry[dy] = 0;
+        }
     }
 
     dspCV_worker_job_t job;
@@ -1279,7 +1292,7 @@ static void pre_process_gray_callback(void *data)
     int32_t remainX = dstWidth - (nnX * VECLEN);
     uint64_t L2FETCH_PARA_H = CreateL2pfParam(srcWidth, srcWidth, 2, 0);
     uint64_t L2FETCH_PARA_V = CreateL2pfParam(srcWidth, 2, srcHeight, 1);
-    int32_t gatherLimit = MAX(srcWidth, srcHeight);
+    int32_t gatherLimit = (rotate == 0 || rotate == 180) ? srcWidth : srcHeight;
 
     const int scale = 1 << 8;
     HVX_Vector vVScaleh = Q6_Vh_vsplat_R(scale);
@@ -1291,8 +1304,6 @@ static void pre_process_gray_callback(void *data)
     for (int32_t i = 0; i < dstRows; dy++, i++) {
         HVX_Vector vV0uh0 = Q6_Vh_vsplat_R(fvAry[dy]);
         HVX_Vector vV1uh0 = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh0);
-        HVX_Vector vV0uh1 = Q6_Vh_vsplat_R(fvAry[dy + 1]);
-        HVX_Vector vV1uh1 = Q6_Vh_vsub_VhVh(vVScaleh, vV0uh1);
 
         HVX_Vector *prgb0 = (HVX_Vector *)(pDst + dy * dstStride);
         int32_t sx, sx_, sy0, sy0_;
@@ -1465,24 +1476,27 @@ int pre_process_gray_resize_rotate(const uint8 *pSrc, int pSrcLen, int srcWidth,
     }
 
     //计算xy在原图上的坐标
+    int32_t dstWidthPad = roundup_t(dstWidth, VECLEN);
+    int32_t dstHeightPad = roundup_t(dstHeight, VECLEN);
+
     uint8_t *ptr = (uint8_t *)vtcm;
     int16_t *sx0Ary = (int16_t *)ptr;
-    ptr += roundup_t(dstWidth * sizeof(int16_t), VECLEN);
+    ptr += dstWidthPad * sizeof(int16_t);
 
     int16_t *sx1Ary = (int16_t *)ptr;
-    ptr += roundup_t(dstWidth * sizeof(int16_t), VECLEN);
+    ptr += dstWidthPad * sizeof(int16_t);
 
     int16_t *syAry = (int16_t *)ptr;
-    ptr += roundup_t(dstHeight * sizeof(int16_t), VECLEN);
+    ptr += dstHeightPad * sizeof(int16_t);
 
     uint16_t *fuAry = (uint16_t *)ptr;
-    ptr += roundup_t(dstWidth * sizeof(uint16_t), VECLEN);
+    ptr += dstWidthPad * sizeof(int16_t);
 
     uint16_t *fvAry = (uint16_t *)ptr;
-    ptr += roundup_t(dstHeight * sizeof(uint16_t), VECLEN);
+    ptr += dstWidthPad * sizeof(int16_t);
 
     const int scale = 1 << 8;
-    for (int dx = 0; dx < dstWidth; ++dx) {
+    for (int dx = 0; dx < dstWidthPad; ++dx) {
         float fx = (float)((dx + 0.5) * xratio - 0.5);
 
         int16_t x = (int16_t)floor(fx);
@@ -1500,14 +1514,20 @@ int pre_process_gray_resize_rotate(const uint8 *pSrc, int pSrcLen, int srcWidth,
             u = 0.f;
         }
 
-        if (rotate == 180) {
-            sx0Ary[dx] = srcWidth - 1 - x;
-            sx1Ary[dx] = MAX(sx0Ary[dx] - 1, 0);
+        if (dx < dstWidth) {
+            if (rotate == 180) {
+                sx0Ary[dx] = srcWidth - 1 - x;
+                sx1Ary[dx] = MAX(sx0Ary[dx] - 1, 0);
+            } else {
+                sx0Ary[dx] = x;
+                sx1Ary[dx] = MAX(x + 1, 0);
+            }
+            fuAry[dx] = (uint16_t)(u * scale);
         } else {
-            sx0Ary[dx] = x;
-            sx1Ary[dx] = MAX(x + 1, 0);
+            sx0Ary[dx] = 0;
+            sx1Ary[dx] = 0;
+            fuAry[dx] = 0;
         }
-        fuAry[dx] = (uint16_t)(u * scale);
     }
 
     for (int dy = 0; dy < dstHeight; ++dy) {
@@ -1528,8 +1548,13 @@ int pre_process_gray_resize_rotate(const uint8 *pSrc, int pSrcLen, int srcWidth,
             v = 0.f;
         }
 
-        syAry[dy] = y;
-        fvAry[dy] = (uint16_t)(v * scale);
+        if (dy < dstHeight) {
+            syAry[dy] = y;
+            fvAry[dy] = (uint16_t)(v * scale);
+        } else {
+            syAry[dy] = 0;
+            fvAry[dy] = 0;
+        }
     }
 
     dspCV_worker_job_t job;
